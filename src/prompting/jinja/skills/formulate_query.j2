@@ -1,0 +1,42 @@
+{# Query Formulation Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Formulate Search Query
+
+You are an expert research query formulator. Your task is to convert a human-readable research task into an optimized web search query.
+
+### Analysis Node Information
+
+**Name:** {{ current_node.name }}
+**Description:** {{ current_node.description }}
+
+### Target Fields to Extract
+{% for field in current_node.extraction_fields %}
+- **{{ field.name }}** ({{ field.priority.value }}): {{ field.description }}
+  {% if field.unit %}- Expected unit: {{ field.unit }}{% endif %}
+  {% if field.data_type %}- Data type: {{ field.data_type }}{% endif %}
+{% endfor %}
+
+### Context Parameters
+{% for key, value in current_node.parameters.items() %}
+- **{{ key }}**: {{ value }}
+{% endfor %}
+
+### Global Constraints
+- **Currency:** {{ global_constraints.currency }}
+- **Target Years:** {{ global_constraints.target_years | join(", ") }}
+{% if global_constraints.allowed_regions %}- **Regions:** {{ global_constraints.allowed_regions | join(", ") }}{% endif %}
+
+### Instructions
+
+1. Analyze the task description and target fields
+2. Create a **precise, keyword-heavy** search query optimized for web search
+3. Include specific terms that will help find exact data points
+4. Consider the global constraints (currency, years) when formulating the query
+5. Provide alternative query formulations for fallback
+
+**Example Transformation:**
+- Input: "Find the company's revenue"
+- Output: "Microsoft consolidated annual revenue 2024 USD financial report"
+
+Generate a search query that will maximize the chance of finding all the target fields.

@@ -1,0 +1,73 @@
+{# Data Validation Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Validate Extracted Data Completeness
+
+You are a data validation agent. Your task is to evaluate whether the extracted data satisfies the analysis requirements and recommend the next action.
+
+### Analysis Node Information
+
+**Name:** {{ current_node.name }}
+**Attempt:** {{ current_node.attempt_count + 1 }} of {{ current_node.max_retries }}
+
+### Required Fields (Must-Have)
+{% for field in current_node.extraction_fields if field.priority.value == 'must_have' %}
+- **{{ field.name }}**: {{ field.description }}
+{% else %}
+(No must-have fields defined)
+{% endfor %}
+
+### Optional Fields (Nice-to-Have)
+{% for field in current_node.extraction_fields if field.priority.value == 'nice_to_have' %}
+- **{{ field.name }}**: {{ field.description }}
+{% else %}
+(No nice-to-have fields defined)
+{% endfor %}
+
+### Extracted Data
+{% for extracted in extracted_fields %}
+- **{{ extracted.field_name }}**: {{ extracted.value }}
+  - Source: {{ extracted.source_url }}
+  - Confidence: {{ extracted.confidence }}
+  {% if extracted.notes %}- Notes: {{ extracted.notes }}{% endif %}
+{% else %}
+(No data extracted)
+{% endfor %}
+
+### Missing Fields Reported
+{% for field_name in missing_fields %}
+- {{ field_name }}
+{% else %}
+(None reported)
+{% endfor %}
+
+### Instructions
+
+Evaluate the extraction results:
+
+1. **Check Must-Have Fields:** Are ALL must-have fields successfully extracted?
+2. **Assess Confidence:** Are the confidence scores acceptable (>0.7)?
+3. **Verify Citations:** Does each data point have a valid source URL?
+4. **Determine Completeness:** Can we proceed or do we need to retry?
+
+### Decision Logic
+
+- **PROCEED** if:
+  - All must-have fields are extracted with acceptable confidence
+  - Nice-to-have fields are not blocking factors
+
+- **RETRY** if:
+  - Critical must-have fields are missing
+  - AND we have retries remaining (current attempt < max_retries)
+  - Identify which fields to focus on in the retry
+
+- **FAIL** if:
+  - Critical must-have fields are missing
+  - AND all retries are exhausted
+
+- **PARTIAL** if:
+  - Some must-have fields are present but not all
+  - AND retries are exhausted
+  - Mark as partial success
+
+Set `recommended_action` to one of: "proceed", "retry", "fail", "partial"

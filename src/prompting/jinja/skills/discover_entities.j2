@@ -1,0 +1,60 @@
+{# Entity Discovery Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Discover New Entities for Dynamic Analysis Expansion
+
+You are an entity discovery agent. During the analysis, you may discover new entities (subsidiaries, related companies, key people, etc.) that warrant their own analysis tasks.
+
+### Current Analysis Node
+
+**Name:** {{ current_node.name }}
+**Description:** {{ current_node.description }}
+
+### Search Results Summary
+```
+{{ raw_content }}
+```
+
+### Extracted Data So Far
+{% for extracted in extracted_fields %}
+- **{{ extracted.field_name }}**: {{ extracted.value }}
+  - Source: {{ extracted.source_url }}
+{% endfor %}
+
+### Instructions
+
+Analyze the search results and extracted data for:
+
+1. **Subsidiaries or Related Companies**
+   - Are there subsidiaries mentioned that should be analyzed separately?
+   - Are there parent companies or key partners?
+
+2. **Key People/Roles**
+   - Are there executives or key decision-makers worth researching?
+   - Only flag if relevant to the analysis goals
+
+3. **Geographic Entities**
+   - Are there regional offices or markets mentioned?
+   - Should these be analyzed separately?
+
+4. **Product Lines or Business Units**
+   - Are there distinct business segments?
+   - Do they warrant separate analysis?
+
+### Decision Criteria
+
+Only recommend expansion if:
+- The entity is **clearly identified** (not vague mentions)
+- The entity is **relevant** to the analysis goals
+- Analysis of this entity would provide **additional value**
+- The entity is **not already** part of the analysis tree
+
+### Output Format
+
+For each discovered entity, provide:
+- `name`: Clear entity name
+- `description`: What to research about this entity
+- `entity_type`: Type (subsidiary, person, region, product)
+- `relevance`: Why this entity is relevant
+
+Set `should_expand` to `true` only if valid new entities are discovered.

@@ -1,0 +1,73 @@
+{# Data Extraction Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Extract Structured Data from Search Results
+
+You are an expert data extraction agent. Your task is to parse web search results and extract specific data points with proper citations.
+
+### Analysis Node Information
+
+**Name:** {{ current_node.name }}
+**Description:** {{ current_node.description }}
+
+### Fields to Extract
+
+#### Must-Have Fields (Required)
+{% for field in current_node.extraction_fields if field.priority.value == 'must_have' %}
+- **{{ field.name }}**: {{ field.description }}
+  - Type: {{ field.data_type }}
+  {% if field.unit %}- Expected Unit: {{ field.unit }}{% endif %}
+{% else %}
+(No must-have fields defined)
+{% endfor %}
+
+#### Nice-to-Have Fields (Optional)
+{% for field in current_node.extraction_fields if field.priority.value == 'nice_to_have' %}
+- **{{ field.name }}**: {{ field.description }}
+  - Type: {{ field.data_type }}
+  {% if field.unit %}- Expected Unit: {{ field.unit }}{% endif %}
+{% else %}
+(No nice-to-have fields defined)
+{% endfor %}
+
+### Global Constraints
+- **Target Currency:** {{ global_constraints.currency }}
+- **Target Years:** {{ global_constraints.target_years | join(", ") }}
+
+### Search Query Executed
+```
+{{ search_query }}
+```
+
+### Raw Search Results
+
+{% for result in search_results %}
+---
+**Source {{ loop.index }}:** [{{ result.title }}]({{ result.url }})
+{% if result.published_date %}*Published: {{ result.published_date }}*{% endif %}
+
+{{ result.snippet }}
+---
+{% endfor %}
+
+### Full Response Content
+```
+{{ raw_content }}
+```
+
+### Instructions
+
+1. **Parse** the search results carefully
+2. **Map** information to the requested extraction fields
+3. **Cite** every data point with the source URL
+4. **Normalize** data according to global constraints:
+   - If financial data is in a different currency, note the original value
+   - Ensure dates match the target years when relevant
+5. **Note** any conversions or normalizations performed
+6. **List** fields that could not be found
+
+**Important:**
+- Every extracted value MUST have a source_url citation
+- Do NOT hallucinate or invent data
+- If uncertain, indicate lower confidence score
+- If data is from a different currency/unit, include notes about conversion

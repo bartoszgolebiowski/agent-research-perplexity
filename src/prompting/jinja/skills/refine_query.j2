@@ -1,0 +1,68 @@
+{# Query Refinement Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Refine Search Query for Retry
+
+You are a search query optimization expert. The previous search attempt did not find all required data. Your task is to create a refined query that targets the missing information.
+
+### Analysis Node Information
+
+**Name:** {{ current_node.name }}
+**Description:** {{ current_node.description }}
+**Attempt:** {{ current_node.attempt_count + 1 }} of {{ current_node.max_retries }}
+
+### Previous Query
+```
+{{ previous_query }}
+```
+
+### Missing Fields to Target
+{% for field_name in missing_fields %}
+{% set field = current_node.extraction_fields | selectattr('name', 'equalto', field_name) | first %}
+- **{{ field_name }}**{% if field %}: {{ field.description }}{% endif %}
+{% endfor %}
+
+### Successfully Extracted (Reference)
+{% for extracted in extracted_fields %}
+- {{ extracted.field_name }}: {{ extracted.value }}
+{% else %}
+(None extracted yet)
+{% endfor %}
+
+### Previous Search Results Summary
+{% if search_results %}
+Found {{ search_results | length }} sources:
+{% for result in search_results[:3] %}
+- {{ result.title }} ({{ result.url }})
+{% endfor %}
+{% else %}
+No results from previous search.
+{% endif %}
+
+### Global Constraints
+- **Currency:** {{ global_constraints.currency }}
+- **Target Years:** {{ global_constraints.target_years | join(", ") }}
+
+### Instructions
+
+1. **Analyze** why the previous query failed to find the missing fields
+2. **Identify** potential reasons:
+   - Query too broad or too narrow?
+   - Missing key terms or context?
+   - Wrong data source type?
+3. **Formulate** a refined query that:
+   - Specifically targets the missing fields
+   - Uses alternative terminology or phrasing
+   - May target different source types (e.g., press releases, SEC filings, news)
+4. **Document** your refinement strategy
+
+### Refinement Strategies to Consider
+
+- Add company/entity name more prominently
+- Include specific year or time period
+- Use industry-specific terminology
+- Target specific document types (annual report, 10-K, press release)
+- Try alternative synonyms for the missing data
+- Add geographic context if relevant
+
+Generate a refined query that maximizes the chance of finding the missing fields.

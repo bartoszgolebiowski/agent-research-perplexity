@@ -1,0 +1,136 @@
+{
+  "name": "Tech Company Analysis - Example",
+  "description": "Example ICP analysis for demonstrating the system capabilities",
+  "global_constraints": {
+    "currency": "USD",
+    "language": "en",
+    "target_years": [2024, 2025],
+    "allowed_regions": ["North America", "Europe"]
+  },
+  "root_nodes": [
+    {
+      "name": "Company Overview",
+      "description": "Research the company's basic information, founding date, headquarters, and mission statement",
+      "extraction_fields": [
+        {
+          "name": "company_name",
+          "description": "Official legal name of the company",
+          "priority": "must_have",
+          "data_type": "string"
+        },
+        {
+          "name": "founding_date",
+          "description": "Date the company was founded",
+          "priority": "must_have",
+          "data_type": "date"
+        },
+        {
+          "name": "headquarters",
+          "description": "Location of company headquarters",
+          "priority": "must_have",
+          "data_type": "string"
+        },
+        {
+          "name": "employee_count",
+          "description": "Approximate number of employees",
+          "priority": "nice_to_have",
+          "data_type": "number"
+        }
+      ],
+      "parameters": {
+        "company": "Microsoft Corporation"
+      },
+      "max_retries": 3,
+      "sub_tasks": [
+        {
+          "name": "Financial Metrics",
+          "description": "Find the company's key financial metrics including revenue and market cap",
+          "extraction_fields": [
+            {
+              "name": "annual_revenue",
+              "description": "Most recent fiscal year total revenue",
+              "priority": "must_have",
+              "data_type": "currency",
+              "unit": "USD"
+            },
+            {
+              "name": "market_cap",
+              "description": "Current market capitalization",
+              "priority": "must_have",
+              "data_type": "currency",
+              "unit": "USD"
+            },
+            {
+              "name": "net_income",
+              "description": "Most recent fiscal year net income",
+              "priority": "nice_to_have",
+              "data_type": "currency",
+              "unit": "USD"
+            }
+          ],
+          "parameters": {
+            "company": "Microsoft Corporation",
+            "fiscal_year": 2024
+          },
+          "max_retries": 3
+        },
+        {
+          "name": "Leadership Team",
+          "description": "Identify key executives and their roles",
+          "extraction_fields": [
+            {
+              "name": "ceo_name",
+              "description": "Name of the Chief Executive Officer",
+              "priority": "must_have",
+              "data_type": "string"
+            },
+            {
+              "name": "cfo_name",
+              "description": "Name of the Chief Financial Officer",
+              "priority": "nice_to_have",
+              "data_type": "string"
+            },
+            {
+              "name": "cto_name",
+              "description": "Name of the Chief Technology Officer",
+              "priority": "nice_to_have",
+              "data_type": "string"
+            }
+          ],
+          "parameters": {
+            "company": "Microsoft Corporation"
+          },
+          "max_retries": 2
+        }
+      ]
+    },
+    {
+      "name": "Product Analysis",
+      "description": "Research the company's main products and services",
+      "extraction_fields": [
+        {
+          "name": "main_products",
+          "description": "List of primary products or services",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "flagship_product",
+          "description": "The company's most significant product",
+          "priority": "must_have",
+          "data_type": "string"
+        },
+        {
+          "name": "product_categories",
+          "description": "Categories of products/services offered",
+          "priority": "nice_to_have",
+          "data_type": "list"
+        }
+      ],
+      "parameters": {
+        "company": "Microsoft Corporation"
+      },
+      "max_retries": 2
+    }
+  ]
+}

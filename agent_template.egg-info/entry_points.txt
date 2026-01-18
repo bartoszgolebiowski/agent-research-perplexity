@@ -1,0 +1,2 @@
+[console_scripts]
+icp-agent = src.icp_agent:main

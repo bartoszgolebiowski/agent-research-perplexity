@@ -13,7 +13,11 @@ dependencies = [
     "jinja2>=3.1",
     "python-dotenv>=1.0",
     "openai>=1.13.3",
+    "requests>=2.31",
 ]
+
+[project.scripts]
+icp-agent = "src.icp_agent:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
