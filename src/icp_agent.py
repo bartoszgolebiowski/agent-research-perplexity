@@ -119,46 +119,50 @@ class ICPAgent:
     def run_from_file(self, input_file: Path) -> ICPAgentResult:
         """Run the ICP analysis from a JSON input file."""
         self._logger.info(f"Starting ICP analysis from file: {input_file}")
-        
+
         try:
             analysis_input = self._validator.validate_file(input_file)
             self._logger.info(f"Validated input: {analysis_input.name}")
         except ValidationError as e:
             self._logger.error(f"Validation failed: {e}")
             return self._error_result(str(e))
-        
+
         return self.run(analysis_input)
 
     def run(self, analysis_input: ICPAnalysisInput) -> ICPAgentResult:
         """Execute the ICP analysis workflow."""
         queue = AnalysisQueue.from_input(analysis_input)
         state = create_icp_initial_state(analysis_input, queue)
-        
+
         self._logger.info(f"Initialized queue with {queue.pending_count()} nodes")
-        
+
         iterations = 0
-        
+
         try:
             for step in range(self._config.max_iterations):
                 iterations = step + 1
                 current_stage = state.workflow.current_stage
-                
-                self._logger.debug(f"Iteration {iterations}: Stage={current_stage.value}")
-                
+
+                self._logger.debug(
+                    f"Iteration {iterations}: Stage={current_stage.value}"
+                )
+
                 if current_stage == WorkflowStage.ICP_REPORT_COMPLETE:
                     break
-                
+
                 state = self._process_stage(state)
             else:
-                self._logger.warning(f"Reached max iterations ({self._config.max_iterations})")
+                self._logger.warning(
+                    f"Reached max iterations ({self._config.max_iterations})"
+                )
         except Exception as e:
             self._logger.error(f"Error during processing: {e}")
             return self._error_result(str(e), state, iterations)
-        
+
         # Generate final output and report
         output = self._create_output(analysis_input)
         report = self._generate_report(output)
-        
+
         return ICPAgentResult(
             state=state,
             output=output,
@@ -170,7 +174,7 @@ class ICPAgent:
     def _process_stage(self, state: AgentState) -> AgentState:
         """Process the current workflow stage."""
         stage = state.workflow.current_stage
-        
+
         # Check for ICP stage handlers (state transitions)
         if stage in ICP_STAGE_HANDLERS:
             handler = ICP_STAGE_HANDLERS[stage]
@@ -178,13 +182,13 @@ class ICPAgent:
             if stage == WorkflowStage.ICP_EXPAND_TREE:
                 return handle_expand_tree(state, self._config.enable_dynamic_expansion)
             return handler(state)
-        
+
         # For LLM/Tool stages, use coordinator decision
         decision = self._coordinator.next_action(state)
-        
+
         if decision.action_type in (ActionType.COMPLETE, ActionType.NOOP):
             return state
-        
+
         if decision.action_type == ActionType.LLM_SKILL and decision.skill:
             self._logger.info(f"Executing skill: {decision.skill.value}")
             context = self._build_context(state)
@@ -194,18 +198,19 @@ class ICPAgent:
             except LLMCallError as e:
                 self._logger.error(f"LLM call failed: {e}")
                 from copy import deepcopy
+
                 new_state = deepcopy(state)
                 new_state.workflow.record_transition(
                     to_stage=WorkflowStage.ICP_NODE_FAILED,
                     reason=f"LLM call failed: {e}",
                 )
                 return new_state
-        
+
         if decision.action_type == ActionType.TOOL and decision.tool_type:
             self._logger.info(f"Executing tool: {decision.tool_type.value}")
             output = self._execute_tool(state, decision.tool_type)
             return update_state_from_tool(state, decision.tool_type, output)
-        
+
         raise RuntimeError(f"Unhandled decision: {decision}")
 
     def _execute_tool(self, state: AgentState, tool: ToolName) -> BaseModel:
@@ -227,25 +232,29 @@ class ICPAgent:
             "procedural": state.procedural,
             "resource": state.resource,
         }
-        
+
         if state.semantic.global_constraints:
             context["global_constraints"] = state.semantic.global_constraints
-        
+
         current_node = state.get_current_node()
         if current_node:
             context["current_node"] = current_node
-        
+
         if state.working.current_search_results:
             results = state.working.current_search_results
             context["search_results"] = results.results
             context["raw_content"] = results.raw_content
-        
+
         if state.working.current_extracted_data:
-            context["extracted_fields"] = state.working.current_extracted_data.extracted_fields
-            context["missing_fields"] = state.working.current_extracted_data.missing_fields
-        
+            context["extracted_fields"] = (
+                state.working.current_extracted_data.extracted_fields
+            )
+            context["missing_fields"] = (
+                state.working.current_extracted_data.missing_fields
+            )
+
         context["previous_query"] = state.working.current_search_query
-        
+
         return context
 
     def _create_output(self, analysis_input: ICPAnalysisInput) -> ICPAnalysisOutput:
@@ -271,7 +280,7 @@ class ICPAgent:
         """Create an error result."""
         if state is None:
             state = create_initial_state(goal="Error")
-        
+
         return ICPAgentResult(
             state=state,
             output=ICPAnalysisOutput(
@@ -288,26 +297,26 @@ class ICPAgent:
 def main() -> None:
     """CLI entry point for running ICP analysis."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="ICP Intelligence Agent")
     parser.add_argument("input_file", type=Path, help="Path to input JSON file")
     parser.add_argument("--output-dir", type=Path, default=Path("./reports"))
     parser.add_argument("--max-iterations", type=int, default=500)
     parser.add_argument("--no-expansion", action="store_true")
-    
+
     args = parser.parse_args()
-    
+
     config = ICPAgentConfig(
         max_iterations=args.max_iterations,
         enable_dynamic_expansion=not args.no_expansion,
         report_output_dir=args.output_dir,
     )
-    
+
     agent = ICPAgent.from_env(config=config)
     result = agent.run_from_file(args.input_file)
-    
+
     print(result.summary())
-    
+
     if not result.success:
         exit(1)
 

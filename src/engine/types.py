@@ -40,19 +40,19 @@ class WorkflowStage(str, Enum):
     # ---------------------------------------------------------------------------
     # ICP Intelligence System Workflow Stages
     # ---------------------------------------------------------------------------
-    
+
     # Phase A: Ingestion
     ICP_INGESTION = "ICP_INGESTION"
     ICP_VALIDATION = "ICP_VALIDATION"
     ICP_QUEUE_READY = "ICP_QUEUE_READY"
-    
+
     # Phase B: Research Loop
     ICP_NODE_START = "ICP_NODE_START"
     ICP_FORMULATE_QUERY = "ICP_FORMULATE_QUERY"
     ICP_EXECUTE_SEARCH = "ICP_EXECUTE_SEARCH"
     ICP_EXTRACT_DATA = "ICP_EXTRACT_DATA"
     ICP_VALIDATE_DATA = "ICP_VALIDATE_DATA"
-    
+
     # Decision Gates
     ICP_DECISION_GATE = "ICP_DECISION_GATE"
     ICP_REFINE_QUERY = "ICP_REFINE_QUERY"
@@ -60,11 +60,11 @@ class WorkflowStage(str, Enum):
     ICP_NODE_FAILED = "ICP_NODE_FAILED"
     ICP_NODE_PARTIAL = "ICP_NODE_PARTIAL"
     ICP_NODE_SKIPPED = "ICP_NODE_SKIPPED"
-    
+
     # Phase C: Dynamic Expansion
     ICP_DISCOVER_ENTITIES = "ICP_DISCOVER_ENTITIES"
     ICP_EXPAND_TREE = "ICP_EXPAND_TREE"
-    
+
     # Phase D: Report Generation
     ICP_ALL_NODES_DONE = "ICP_ALL_NODES_DONE"
     ICP_GENERATE_REPORT = "ICP_GENERATE_REPORT"

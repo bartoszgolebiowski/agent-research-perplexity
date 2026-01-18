@@ -14,7 +14,7 @@ from src.engine.types import AnalysisNodeStatus
 class AnalysisQueue:
     """
     Manages the execution queue for analysis nodes.
-    
+
     Ensures parent nodes are processed before children and supports
     dynamic node insertion for discovered sub-tasks.
     """
@@ -29,20 +29,20 @@ class AnalysisQueue:
         """Create a queue from an input specification."""
         queue = cls()
         queue._input = input_spec
-        
+
         # Build node lookup and queue in tree order
         all_nodes = input_spec.get_all_nodes()
         for node in all_nodes:
             queue._nodes[node.id] = node
             if node.status == AnalysisNodeStatus.PENDING:
                 queue._queue.append(node.id)
-        
+
         return queue
 
     def get_next_pending(self) -> Optional[AnalysisNode]:
         """
         Get the next pending node from the queue.
-        
+
         Skips nodes that are no longer pending (may have been updated).
         """
         while self._queue:
@@ -93,18 +93,18 @@ class AnalysisQueue:
     def add_dynamic_node(self, node: AnalysisNode, parent_id: str) -> None:
         """
         Add a dynamically discovered node to the queue.
-        
+
         The node is added after its parent's position in processing order.
         """
         node.parent_id = parent_id
         self._nodes[node.id] = node
-        
+
         # Also add to the parent's sub_tasks if input is available
         if self._input:
             parent = self._input.get_node_by_id(parent_id)
             if parent:
                 parent.sub_tasks.append(node)
-        
+
         # Add to queue
         self._queue.append(node.id)
 
@@ -127,8 +127,7 @@ class AnalysisQueue:
     def pending_count(self) -> int:
         """Count remaining pending nodes."""
         return sum(
-            1 for n in self._nodes.values() 
-            if n.status == AnalysisNodeStatus.PENDING
+            1 for n in self._nodes.values() if n.status == AnalysisNodeStatus.PENDING
         )
 
     def get_input(self) -> Optional[ICPAnalysisInput]:

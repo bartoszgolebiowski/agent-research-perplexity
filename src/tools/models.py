@@ -39,8 +39,7 @@ class SearchResultItem(BaseModel):
     url: str = Field(..., description="URL of the source")
     snippet: str = Field(..., description="Text snippet from the result")
     published_date: Optional[str] = Field(
-        default=None,
-        description="Published date if available"
+        default=None, description="Published date if available"
     )
 
 
@@ -50,16 +49,13 @@ class WebSearchRequest(BaseModel):
     query: str = Field(..., description="The search query to execute")
     node_id: str = Field(..., description="ID of the analysis node this search is for")
     target_fields: List[str] = Field(
-        default_factory=list,
-        description="Names of fields we're trying to extract"
+        default_factory=list, description="Names of fields we're trying to extract"
     )
     attempt_number: int = Field(
-        default=1,
-        description="Which attempt this is (for retry logic)"
+        default=1, description="Which attempt this is (for retry logic)"
     )
     context: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional context for the search"
+        default_factory=dict, description="Additional context for the search"
     )
 
 
@@ -69,26 +65,19 @@ class WebSearchResponse(BaseModel):
     query: str = Field(..., description="The executed search query")
     node_id: str = Field(..., description="ID of the analysis node")
     results: List[SearchResultItem] = Field(
-        default_factory=list,
-        description="List of search results"
+        default_factory=list, description="List of search results"
     )
     raw_content: str = Field(
-        default="",
-        description="Raw concatenated content from all results"
+        default="", description="Raw concatenated content from all results"
     )
-    success: bool = Field(
-        default=True,
-        description="Whether the search was successful"
-    )
+    success: bool = Field(default=True, description="Whether the search was successful")
     error_message: Optional[str] = Field(
-        default=None,
-        description="Error message if search failed"
+        default=None, description="Error message if search failed"
     )
     http_errors: List[str] = Field(
         default_factory=list,
-        description="List of HTTP errors encountered (403, 404, etc.)"
+        description="List of HTTP errors encountered (403, 404, etc.)",
     )
     executed_at: datetime = Field(
-        default_factory=datetime.now,
-        description="Timestamp of search execution"
+        default_factory=datetime.now, description="Timestamp of search execution"
     )

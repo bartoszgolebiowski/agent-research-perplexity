@@ -26,11 +26,9 @@ TRANSITIONS: Dict[WorkflowStage, Tuple[ActionType, Union[SkillName, ToolName], s
         SkillName.HELLO_WORLD,
         "Workflow completed successfully",
     ),
-    
     # ---------------------------------------------------------------------------
     # ICP Intelligence System Workflow Transitions
     # ---------------------------------------------------------------------------
-    
     # Phase A: Ingestion (handled specially in ICPCoordinator)
     WorkflowStage.ICP_INGESTION: (
         ActionType.NOOP,
@@ -47,7 +45,6 @@ TRANSITIONS: Dict[WorkflowStage, Tuple[ActionType, Union[SkillName, ToolName], s
         SkillName.HELLO_WORLD,
         "Queue initialized - proceeding to first node",
     ),
-    
     # Phase B: Research Loop
     WorkflowStage.ICP_NODE_START: (
         ActionType.NOOP,
@@ -74,7 +71,6 @@ TRANSITIONS: Dict[WorkflowStage, Tuple[ActionType, Union[SkillName, ToolName], s
         SkillName.VALIDATE_DATA,
         "Validating extracted data completeness",
     ),
-    
     # Decision Gates
     WorkflowStage.ICP_DECISION_GATE: (
         ActionType.NOOP,
@@ -106,7 +102,6 @@ TRANSITIONS: Dict[WorkflowStage, Tuple[ActionType, Union[SkillName, ToolName], s
         SkillName.HELLO_WORLD,
         "Node skipped (nice-to-have only)",
     ),
-    
     # Phase C: Dynamic Expansion
     WorkflowStage.ICP_DISCOVER_ENTITIES: (
         ActionType.LLM_SKILL,
@@ -118,7 +113,6 @@ TRANSITIONS: Dict[WorkflowStage, Tuple[ActionType, Union[SkillName, ToolName], s
         SkillName.HELLO_WORLD,
         "Expanding analysis tree with discovered entities",
     ),
-    
     # Phase D: Report Generation
     WorkflowStage.ICP_ALL_NODES_DONE: (
         ActionType.NOOP,

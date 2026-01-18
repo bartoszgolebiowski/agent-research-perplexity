@@ -31,12 +31,10 @@ class WebSearchConfig:
         """Create configuration from environment variables."""
         api_key = os.environ.get("PERPLEXITY_API_KEY", "")
         base_url = os.environ.get("PERPLEXITY_BASE_URL", "https://api.perplexity.ai")
-        model = os.environ.get(
-            "PERPLEXITY_MODEL", "llama-3.1-sonar-small-128k-online"
-        )
+        model = os.environ.get("PERPLEXITY_MODEL", "llama-3.1-sonar-small-128k-online")
         timeout = int(os.environ.get("PERPLEXITY_TIMEOUT", "30"))
         max_results = int(os.environ.get("PERPLEXITY_MAX_RESULTS", "5"))
-        
+
         return cls(
             api_key=api_key,
             base_url=base_url,
@@ -50,7 +48,7 @@ class WebSearchConfig:
 class WebSearchClient:
     """
     Web search client using Perplexity API.
-    
+
     This client wraps the Perplexity API to provide web search capabilities
     with structured result parsing and error handling.
     """
@@ -65,10 +63,10 @@ class WebSearchClient:
     def search(self, request: WebSearchRequest) -> WebSearchResponse:
         """
         Execute a web search query.
-        
+
         Args:
             request: The search request with query and context
-            
+
         Returns:
             WebSearchResponse with results or error information
         """

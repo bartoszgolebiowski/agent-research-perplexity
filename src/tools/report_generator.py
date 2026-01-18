@@ -21,16 +21,14 @@ class ReportRequest(BaseModel):
         ..., description="The completed analysis output to generate report from"
     )
     output_directory: Path = Field(
-        default=Path("./reports"),
-        description="Directory to write reports to"
+        default=Path("./reports"), description="Directory to write reports to"
     )
     template_name: str = Field(
         default="report/icp_report.j2",
-        description="Jinja2 template to use for HTML generation"
+        description="Jinja2 template to use for HTML generation",
     )
     include_raw_data: bool = Field(
-        default=True,
-        description="Whether to include raw JSON data in the report"
+        default=True, description="Whether to include raw JSON data in the report"
     )
 
 
@@ -40,13 +38,11 @@ class ReportResponse(BaseModel):
     html_path: Path = Field(..., description="Path to generated HTML report")
     json_path: Path = Field(..., description="Path to exported JSON data")
     generated_at: datetime = Field(
-        default_factory=datetime.now,
-        description="Timestamp of report generation"
+        default_factory=datetime.now, description="Timestamp of report generation"
     )
     success: bool = Field(default=True, description="Whether generation succeeded")
     error_message: str | None = Field(
-        default=None,
-        description="Error message if generation failed"
+        default=None, description="Error message if generation failed"
     )
 
 
@@ -54,7 +50,7 @@ class ReportResponse(BaseModel):
 class ReportGeneratorClient:
     """
     Generates HTML reports from ICP analysis results.
-    
+
     Uses Jinja2 templates to separate data from presentation.
     The AI never writes raw HTML - it populates JSON data that
     the template engine renders.
@@ -68,10 +64,10 @@ class ReportGeneratorClient:
     def generate(self, request: ReportRequest) -> ReportResponse:
         """
         Generate HTML and JSON reports from analysis results.
-        
+
         Args:
             request: The report generation request
-            
+
         Returns:
             ReportResponse with paths to generated files
         """
@@ -81,22 +77,22 @@ class ReportGeneratorClient:
         # Generate filenames with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         base_name = self._sanitize_filename(request.analysis_output.input.name)
-        
+
         json_path = output_dir / f"{base_name}_{timestamp}.json"
         html_path = output_dir / f"{base_name}_{timestamp}.html"
 
         try:
             # Export JSON data
             self._export_json(request.analysis_output, json_path)
-            
+
             # Generate HTML report
             self._generate_html(
                 request.analysis_output,
                 html_path,
                 request.template_name,
-                request.include_raw_data
+                request.include_raw_data,
             )
-            
+
             return ReportResponse(
                 html_path=html_path,
                 json_path=json_path,
@@ -116,7 +112,7 @@ class ReportGeneratorClient:
         """Export the analysis output as JSON."""
         output.compute_statistics()
         json_data = output.model_dump(mode="json")
-        
+
         with open(path, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=2, ensure_ascii=False, default=str)
 
@@ -125,18 +121,18 @@ class ReportGeneratorClient:
         output: ICPAnalysisOutput,
         path: Path,
         template_name: str,
-        include_raw_data: bool
+        include_raw_data: bool,
     ) -> None:
         """Generate HTML report using Jinja2 template."""
         context = self._build_template_context(output, include_raw_data)
-        
+
         try:
             template = prompt_environment.get_template(template_name)
             html_content = template.render(**context)
         except Exception:
             # Fall back to inline template if custom template not found
             html_content = self._generate_fallback_html(context)
-        
+
         with open(path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
@@ -145,7 +141,7 @@ class ReportGeneratorClient:
     ) -> Dict[str, Any]:
         """Build the context dictionary for template rendering."""
         output.compute_statistics()
-        
+
         nodes_data = []
         for node in output.input.get_all_nodes():
             node_data = {
@@ -157,7 +153,7 @@ class ReportGeneratorClient:
                 "extracted_data": [],
                 "missing_fields": [],
             }
-            
+
             if node.result:
                 node_data["extracted_data"] = [
                     {
@@ -171,9 +167,9 @@ class ReportGeneratorClient:
                 ]
                 node_data["missing_fields"] = node.result.missing_fields
                 node_data["queries_used"] = node.result.search_queries_used
-            
+
             nodes_data.append(node_data)
-        
+
         return {
             "report_title": f"ICP Analysis: {output.input.name}",
             "generated_at": output.completed_at.strftime("%Y-%m-%d %H:%M:%S"),
@@ -221,65 +217,83 @@ class ReportGeneratorClient:
             f"  <h1>{context['report_title']}</h1>",
             f"  <p><strong>Generated:</strong> {context['generated_at']}</p>",
         ]
-        
+
         if context.get("analysis_description"):
             html_parts.append(f"  <p>{context['analysis_description']}</p>")
-        
+
         # Statistics
         stats = context["statistics"]
-        html_parts.extend([
-            "  <div class='stats'>",
-            f"    <div class='stat'><div class='stat-value'>{stats['total']}</div>Total Nodes</div>",
-            f"    <div class='stat'><div class='stat-value'>{stats['successful']}</div>Successful</div>",
-            f"    <div class='stat'><div class='stat-value'>{stats['partial']}</div>Partial</div>",
-            f"    <div class='stat'><div class='stat-value'>{stats['failed']}</div>Failed</div>",
-            f"    <div class='stat'><div class='stat-value'>{stats['skipped']}</div>Skipped</div>",
-            "  </div>",
-        ])
-        
+        html_parts.extend(
+            [
+                "  <div class='stats'>",
+                f"    <div class='stat'><div class='stat-value'>{stats['total']}</div>Total Nodes</div>",
+                f"    <div class='stat'><div class='stat-value'>{stats['successful']}</div>Successful</div>",
+                f"    <div class='stat'><div class='stat-value'>{stats['partial']}</div>Partial</div>",
+                f"    <div class='stat'><div class='stat-value'>{stats['failed']}</div>Failed</div>",
+                f"    <div class='stat'><div class='stat-value'>{stats['skipped']}</div>Skipped</div>",
+                "  </div>",
+            ]
+        )
+
         # Nodes
         html_parts.append("  <h2>Analysis Results</h2>")
         for node in context["nodes"]:
             status_class = f"status-{node['status']}"
-            html_parts.extend([
-                f"  <div class='node {status_class}'>",
-                f"    <h3>{node['name']}</h3>",
-                f"    <p><strong>Status:</strong> {node['status']} | <strong>Attempts:</strong> {node['attempt_count']}</p>",
-                f"    <p>{node['description']}</p>",
-            ])
-            
+            html_parts.extend(
+                [
+                    f"  <div class='node {status_class}'>",
+                    f"    <h3>{node['name']}</h3>",
+                    f"    <p><strong>Status:</strong> {node['status']} | <strong>Attempts:</strong> {node['attempt_count']}</p>",
+                    f"    <p>{node['description']}</p>",
+                ]
+            )
+
             if node["extracted_data"]:
                 html_parts.append("    <h4>Extracted Data</h4>")
-                html_parts.append("    <table><tr><th>Field</th><th>Value</th><th>Source</th><th>Confidence</th></tr>")
+                html_parts.append(
+                    "    <table><tr><th>Field</th><th>Value</th><th>Source</th><th>Confidence</th></tr>"
+                )
                 for dp in node["extracted_data"]:
-                    source_link = f"<a href='{dp['source']}' target='_blank'>Source</a>" if dp.get('source') else "N/A"
-                    confidence = f"{dp['confidence']:.0%}" if dp.get('confidence') else "N/A"
+                    source_link = (
+                        f"<a href='{dp['source']}' target='_blank'>Source</a>"
+                        if dp.get("source")
+                        else "N/A"
+                    )
+                    confidence = (
+                        f"{dp['confidence']:.0%}" if dp.get("confidence") else "N/A"
+                    )
                     html_parts.append(
                         f"    <tr><td>{dp['field']}</td><td>{dp['value']}</td>"
                         f"<td>{source_link}</td><td>{confidence}</td></tr>"
                     )
                 html_parts.append("    </table>")
-            
+
             if node["missing_fields"]:
-                html_parts.append(f"    <p><strong>Missing Fields:</strong> {', '.join(node['missing_fields'])}</p>")
-            
+                html_parts.append(
+                    f"    <p><strong>Missing Fields:</strong> {', '.join(node['missing_fields'])}</p>"
+                )
+
             html_parts.append("  </div>")
-        
+
         # Raw JSON if enabled
         if context.get("include_raw_data") and context.get("raw_json"):
-            html_parts.extend([
-                "  <h2>Raw JSON Data</h2>",
-                "  <details>",
-                "    <summary>Click to expand</summary>",
-                f"    <pre>{context['raw_json']}</pre>",
-                "  </details>",
-            ])
-        
-        html_parts.extend([
-            "</body>",
-            "</html>",
-        ])
-        
+            html_parts.extend(
+                [
+                    "  <h2>Raw JSON Data</h2>",
+                    "  <details>",
+                    "    <summary>Click to expand</summary>",
+                    f"    <pre>{context['raw_json']}</pre>",
+                    "  </details>",
+                ]
+            )
+
+        html_parts.extend(
+            [
+                "</body>",
+                "</html>",
+            ]
+        )
+
         return "\n".join(html_parts)
 
     @staticmethod

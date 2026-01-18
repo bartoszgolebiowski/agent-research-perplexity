@@ -120,17 +120,17 @@ def skill_formulate_query_handler(
 ) -> AgentState:
     """Handler for query formulation skill."""
     new_state = deepcopy(state)
-    
+
     # Store the formulated query in working memory
     new_state.working.current_search_query = output.search_query
     new_state.working.missing_fields = output.target_fields
-    
+
     # Advance to search execution stage
     new_state.workflow.record_transition(
         to_stage=WorkflowStage.ICP_EXECUTE_SEARCH,
         reason=output.query_strategy,
     )
-    
+
     return new_state
 
 
@@ -139,25 +139,27 @@ def skill_extract_data_handler(
 ) -> AgentState:
     """Handler for data extraction skill."""
     new_state = deepcopy(state)
-    
+
     # Store extracted data in working memory
     new_state.working.current_extracted_data = output
     new_state.working.missing_fields = output.missing_fields
-    
+
     # Log extraction in episodic memory
-    new_state.episodic.extraction_history.append({
-        "node_id": new_state.working.current_node_id,
-        "timestamp": datetime.now().isoformat(),
-        "extracted_count": len(output.extracted_fields),
-        "missing_count": len(output.missing_fields),
-    })
-    
+    new_state.episodic.extraction_history.append(
+        {
+            "node_id": new_state.working.current_node_id,
+            "timestamp": datetime.now().isoformat(),
+            "extracted_count": len(output.extracted_fields),
+            "missing_count": len(output.missing_fields),
+        }
+    )
+
     # Advance to validation stage
     new_state.workflow.record_transition(
         to_stage=WorkflowStage.ICP_VALIDATE_DATA,
         reason=output.chain_of_thought,
     )
-    
+
     return new_state
 
 
@@ -166,11 +168,11 @@ def skill_validate_data_handler(
 ) -> AgentState:
     """Handler for data validation skill."""
     new_state = deepcopy(state)
-    
+
     # Store validation result
     new_state.working.current_validation_result = output
     new_state.working.missing_fields = output.missing_must_have
-    
+
     # Route to appropriate next stage based on recommendation
     if output.recommended_action == "proceed":
         next_stage = WorkflowStage.ICP_DISCOVER_ENTITIES
@@ -181,12 +183,12 @@ def skill_validate_data_handler(
         next_stage = WorkflowStage.ICP_NODE_PARTIAL
     else:  # fail
         next_stage = WorkflowStage.ICP_NODE_FAILED
-    
+
     new_state.workflow.record_transition(
         to_stage=next_stage,
         reason=output.validation_notes,
     )
-    
+
     return new_state
 
 
@@ -195,18 +197,18 @@ def skill_refine_query_handler(
 ) -> AgentState:
     """Handler for query refinement skill (retry flow)."""
     new_state = deepcopy(state)
-    
+
     # Update the search query with refined version
     new_state.working.current_search_query = output.refined_query
     new_state.working.missing_fields = output.focus_fields
     new_state.working.retry_reason = output.failure_analysis
-    
+
     # Advance back to search execution for retry
     new_state.workflow.record_transition(
         to_stage=WorkflowStage.ICP_EXECUTE_SEARCH,
         reason=output.refinement_strategy,
     )
-    
+
     return new_state
 
 
@@ -215,7 +217,7 @@ def skill_discover_entities_handler(
 ) -> AgentState:
     """Handler for entity discovery skill."""
     new_state = deepcopy(state)
-    
+
     if output.should_expand and output.discovered_entities:
         # Store discovered entities for tree expansion
         new_state.working.query_analysis = {
@@ -232,7 +234,7 @@ def skill_discover_entities_handler(
             to_stage=WorkflowStage.ICP_NODE_COMPLETE,
             reason="No new entities discovered",
         )
-    
+
     return new_state
 
 
@@ -274,35 +276,39 @@ def tool_welcome_handler(state: AgentState, output: HelloWorldResponse) -> Agent
 def tool_web_search_handler(state: AgentState, output: WebSearchResponse) -> AgentState:
     """Handler for web search tool results."""
     new_state = deepcopy(state)
-    
+
     # Store search results in working memory
     new_state.working.current_search_results = output
-    
+
     # Update resource tracking
     new_state.resource.api_calls_made += 1
     new_state.resource.last_api_call_time = output.executed_at
-    
+
     # Log search in episodic memory
-    new_state.episodic.search_history.append({
-        "node_id": output.node_id,
-        "query": output.query,
-        "timestamp": output.executed_at.isoformat(),
-        "result_count": len(output.results),
-        "success": output.success,
-        "http_errors": output.http_errors,
-    })
-    
+    new_state.episodic.search_history.append(
+        {
+            "node_id": output.node_id,
+            "query": output.query,
+            "timestamp": output.executed_at.isoformat(),
+            "result_count": len(output.results),
+            "success": output.success,
+            "http_errors": output.http_errors,
+        }
+    )
+
     # Handle search errors
     if not output.success:
         # Log error
-        new_state.episodic.error_log.append({
-            "node_id": output.node_id,
-            "error_type": "search_failed",
-            "message": output.error_message,
-            "http_errors": output.http_errors,
-            "timestamp": output.executed_at.isoformat(),
-        })
-        
+        new_state.episodic.error_log.append(
+            {
+                "node_id": output.node_id,
+                "error_type": "search_failed",
+                "message": output.error_message,
+                "http_errors": output.http_errors,
+                "timestamp": output.executed_at.isoformat(),
+            }
+        )
+
         # Check if we can retry
         current_node = new_state.get_current_node()
         if current_node and current_node.can_retry():
@@ -321,7 +327,7 @@ def tool_web_search_handler(state: AgentState, output: WebSearchResponse) -> Age
             to_stage=WorkflowStage.ICP_EXTRACT_DATA,
             reason=f"Search returned {len(output.results)} results",
         )
-    
+
     return new_state
 
 
@@ -339,10 +345,10 @@ _TOOL_HANDLERS: Dict[ToolName, ToolHandler] = {
 def handle_queue_next(state: AgentState) -> AgentState:
     """Move to the next pending node or finish."""
     from .queue import AnalysisQueue
-    
+
     new_state = deepcopy(state)
     queue: AnalysisQueue = new_state.icp_queue  # type: ignore
-    
+
     # Clear working memory
     new_state.working.current_node_id = None
     new_state.working.current_search_query = None
@@ -351,7 +357,7 @@ def handle_queue_next(state: AgentState) -> AgentState:
     new_state.working.current_validation_result = None
     new_state.working.missing_fields = []
     new_state.working.retry_reason = None
-    
+
     next_node = queue.get_next_pending()
     if next_node:
         new_state.working.current_node_id = next_node.id
@@ -365,7 +371,7 @@ def handle_queue_next(state: AgentState) -> AgentState:
             to_stage=WorkflowStage.ICP_ALL_NODES_DONE,
             reason="No pending nodes",
         )
-    
+
     return new_state
 
 
@@ -374,12 +380,12 @@ def handle_node_done(state: AgentState) -> AgentState:
     from .queue import AnalysisQueue
     from .models import AnalysisNodeResult, ExtractedDataPoint
     from src.engine.types import AnalysisNodeStatus
-    
+
     new_state = deepcopy(state)
     queue: AnalysisQueue = new_state.icp_queue  # type: ignore
     node_id = new_state.working.current_node_id
     stage = state.workflow.current_stage
-    
+
     if node_id:
         # Map stage to status and update queue
         status_map = {
@@ -389,10 +395,10 @@ def handle_node_done(state: AgentState) -> AgentState:
             WorkflowStage.ICP_NODE_SKIPPED: AnalysisNodeStatus.SKIPPED,
         }
         status = status_map.get(stage, AnalysisNodeStatus.COMPLETED)
-        
+
         # Store node result
         _store_node_result(new_state, node_id, status)
-        
+
         if status == AnalysisNodeStatus.COMPLETED:
             queue.mark_completed(node_id)
             new_state.workflow.nodes_successful += 1
@@ -403,9 +409,9 @@ def handle_node_done(state: AgentState) -> AgentState:
             queue.mark_partial(node_id)
         else:
             queue.mark_skipped(node_id)
-        
+
         new_state.workflow.nodes_processed += 1
-    
+
     # Transition to get next node
     new_state.workflow.record_transition(
         to_stage=WorkflowStage.ICP_QUEUE_READY,
@@ -418,22 +424,22 @@ def handle_expand_tree(state: AgentState, enable_expansion: bool = True) -> Agen
     """Handle dynamic tree expansion."""
     from .queue import AnalysisQueue
     from .models import AnalysisNode
-    
+
     new_state = deepcopy(state)
-    
+
     if not enable_expansion:
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_NODE_COMPLETE,
             reason="Dynamic expansion disabled",
         )
         return new_state
-    
+
     discovery_data = new_state.working.query_analysis
     parent_id = new_state.working.current_node_id
-    
+
     if discovery_data and "discovered_entities" in discovery_data and parent_id:
         queue: AnalysisQueue = new_state.icp_queue  # type: ignore
-        
+
         for entity in discovery_data["discovered_entities"]:
             new_node = AnalysisNode(
                 name=entity.get("name", "Discovered Entity"),
@@ -441,7 +447,7 @@ def handle_expand_tree(state: AgentState, enable_expansion: bool = True) -> Agen
                 parameters={"entity_type": entity.get("entity_type", "unknown")},
             )
             queue.add_dynamic_node(new_node, parent_id)
-    
+
     new_state.workflow.record_transition(
         to_stage=WorkflowStage.ICP_NODE_COMPLETE,
         reason="Tree expansion complete",
@@ -476,23 +482,23 @@ def _store_node_result(
     from .queue import AnalysisQueue
     from .models import AnalysisNodeResult, ExtractedDataPoint
     from src.engine.types import AnalysisNodeStatus
-    
+
     queue: AnalysisQueue = state.icp_queue  # type: ignore
     node = queue.get_node(node_id)
-    
+
     if not node:
         return
-    
+
     extracted_data = state.working.current_extracted_data
     search_query = state.working.current_search_query
-    
+
     extracted_points: list[ExtractedDataPoint] = []
     missing_fields: list[str] = []
     queries_used: list[str] = []
-    
+
     if search_query:
         queries_used.append(search_query)
-    
+
     if extracted_data and hasattr(extracted_data, "extracted_fields"):
         for ef in extracted_data.extracted_fields:
             extracted_points.append(
@@ -506,7 +512,7 @@ def _store_node_result(
                 )
             )
         missing_fields = extracted_data.missing_fields
-    
+
     node.result = AnalysisNodeResult(
         extracted_data=extracted_points,
         missing_fields=missing_fields,
@@ -514,7 +520,7 @@ def _store_node_result(
         completed_at=datetime.now(),
     )
     node.status = status
-    
+
     state.semantic.extracted_knowledge[node_id] = {
         "status": status.value,
         "data": [dp.model_dump() for dp in extracted_points],

@@ -14,7 +14,7 @@ class SkillName(str, Enum):
 
     HELLO_WORLD = "hello_world"
     ANALYZE_AND_PLAN = "analyze_and_plan"
-    
+
     # ICP Intelligence System Skills
     FORMULATE_QUERY = "formulate_query"
     EXTRACT_DATA = "extract_data"
