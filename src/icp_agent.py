@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dotenv import load_dotenv
+
 """
 ICP Intelligence Agent - Main entry point for the automated research workflow.
 
@@ -18,8 +20,9 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
-from src.engine import AgentActionCoordinator, LLMExecutor
-from src.engine.types import ActionType, WorkflowStage
+from src.engine.coordinator import AgentActionCoordinator
+from src.engine.executor import LLMExecutor
+from src.engine.types import ActionType, AnalysisNodeStatus, WorkflowStage
 from src.llm import LLMCallError
 from src.logger import get_agent_logger
 from src.memory import (
@@ -143,8 +146,32 @@ class ICPAgent:
                 iterations = step + 1
                 current_stage = state.workflow.current_stage
 
-                self._logger.debug(
-                    f"Iteration {iterations}: Stage={current_stage.value}"
+                # Count node statuses
+                all_nodes = state.semantic.analysis_input.get_all_nodes()
+                total_nodes = len(all_nodes)
+                pending_count = len(
+                    [n for n in all_nodes if n.status == AnalysisNodeStatus.PENDING]
+                )
+                in_progress_count = len(
+                    [n for n in all_nodes if n.status == AnalysisNodeStatus.IN_PROGRESS]
+                )
+                completed_count = len(
+                    [n for n in all_nodes if n.status == AnalysisNodeStatus.COMPLETED]
+                )
+                partial_count = len(
+                    [n for n in all_nodes if n.status == AnalysisNodeStatus.PARTIAL]
+                )
+                failed_count = len(
+                    [n for n in all_nodes if n.status == AnalysisNodeStatus.FAILED]
+                )
+                skipped_count = len(
+                    [n for n in all_nodes if n.status == AnalysisNodeStatus.SKIPPED]
+                )
+
+                self._logger.info(
+                    f"Iteration {iterations}: Total={total_nodes}, Pending={pending_count}, "
+                    f"InProgress={in_progress_count}, Completed={completed_count}, "
+                    f"Partial={partial_count}, Failed={failed_count}, Skipped={skipped_count} | Stage={current_stage.value}"
                 )
 
                 if current_stage == WorkflowStage.ICP_REPORT_COMPLETE:
@@ -192,8 +219,14 @@ class ICPAgent:
         if decision.action_type == ActionType.LLM_SKILL and decision.skill:
             self._logger.info(f"Executing skill: {decision.skill.value}")
             context = self._build_context(state)
+            self._logger.debug(f"Skill input context keys: {list(context.keys())}")
             try:
                 output = self._llm_executor.execute(decision.skill, context)
+                self._logger.info(f"Skill {decision.skill.value} completed")
+                self._logger.debug(
+                    f"Skill output: {output.model_dump() if hasattr(output, 'model_dump') else output}"
+                )
+                return update_state_from_skill(state, decision.skill, output)
                 return update_state_from_skill(state, decision.skill, output)
             except LLMCallError as e:
                 self._logger.error(f"LLM call failed: {e}")
@@ -209,6 +242,10 @@ class ICPAgent:
         if decision.action_type == ActionType.TOOL and decision.tool_type:
             self._logger.info(f"Executing tool: {decision.tool_type.value}")
             output = self._execute_tool(state, decision.tool_type)
+            self._logger.info(f"Tool {decision.tool_type.value} completed")
+            self._logger.debug(
+                f"Tool output: {output.model_dump() if hasattr(output, 'model_dump') else output}"
+            )
             return update_state_from_tool(state, decision.tool_type, output)
 
         raise RuntimeError(f"Unhandled decision: {decision}")
@@ -217,6 +254,7 @@ class ICPAgent:
         """Execute a tool and return its output."""
         if tool == ToolName.WEB_SEARCH:
             request = state.get_web_search_request()
+            self._logger.debug(f"Tool input (web_search): {request.model_dump()}")
             return self._search_client.search(request)
         raise RuntimeError(f"Unknown tool: {tool}")
 
@@ -244,6 +282,9 @@ class ICPAgent:
             results = state.working.current_search_results
             context["search_results"] = results.results
             context["raw_content"] = results.raw_content
+        else:
+            context["search_results"] = []
+            context["raw_content"] = ""
 
         if state.working.current_extracted_data:
             context["extracted_fields"] = (
@@ -252,9 +293,12 @@ class ICPAgent:
             context["missing_fields"] = (
                 state.working.current_extracted_data.missing_fields
             )
+        else:
+            context["extracted_fields"] = []
+            context["missing_fields"] = []
 
         context["previous_query"] = state.working.current_search_query
-
+        context["search_query"] = state.working.current_search_query
         return context
 
     def _create_output(self, analysis_input: ICPAnalysisInput) -> ICPAnalysisOutput:
@@ -312,6 +356,7 @@ def main() -> None:
         report_output_dir=args.output_dir,
     )
 
+    load_dotenv()
     agent = ICPAgent.from_env(config=config)
     result = agent.run_from_file(args.input_file)
 

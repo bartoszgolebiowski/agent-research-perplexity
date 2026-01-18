@@ -1,13 +1,15 @@
 from __future__ import annotations
+from unittest import result
 
-"""Web Search tool implementation using Perplexity/Tavily API."""
+"""Web Search tool implementation using Perplexity SDK."""
 
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 
-import requests
+from perplexity import Perplexity
+from perplexity.types import SearchCreateResponse
 
 from .models import (
     SearchResultItem,
@@ -21,39 +23,44 @@ class WebSearchConfig:
     """Configuration for the web search client."""
 
     api_key: str
-    base_url: str = "https://api.perplexity.ai"
-    model: str = "llama-3.1-sonar-small-128k-online"
-    timeout: int = 30
-    max_results: int = 5
+    max_results: int = 3
+    max_tokens: int = 25000
+    max_tokens_per_page: int = 1024
 
     @classmethod
     def from_env(cls) -> "WebSearchConfig":
         """Create configuration from environment variables."""
         api_key = os.environ.get("PERPLEXITY_API_KEY", "")
-        base_url = os.environ.get("PERPLEXITY_BASE_URL", "https://api.perplexity.ai")
-        model = os.environ.get("PERPLEXITY_MODEL", "llama-3.1-sonar-small-128k-online")
-        timeout = int(os.environ.get("PERPLEXITY_TIMEOUT", "30"))
-        max_results = int(os.environ.get("PERPLEXITY_MAX_RESULTS", "5"))
+        max_results = int(os.environ.get("PERPLEXITY_MAX_RESULTS", "3"))
+        max_tokens = int(os.environ.get("PERPLEXITY_MAX_TOKENS", "25000"))
+        max_tokens_per_page = int(
+            os.environ.get("PERPLEXITY_MAX_TOKENS_PER_PAGE", "1024")
+        )
 
         return cls(
             api_key=api_key,
-            base_url=base_url,
-            model=model,
-            timeout=timeout,
             max_results=max_results,
+            max_tokens=max_tokens,
+            max_tokens_per_page=max_tokens_per_page,
         )
 
 
 @dataclass(slots=True)
 class WebSearchClient:
     """
-    Web search client using Perplexity API.
+    Web search client using Perplexity SDK.
 
-    This client wraps the Perplexity API to provide web search capabilities
+    This client wraps the Perplexity SDK to provide web search capabilities
     with structured result parsing and error handling.
     """
 
     config: WebSearchConfig
+    _client: Optional[Perplexity] = field(default=None, init=False)
+
+    def __post_init__(self) -> None:
+        """Initialize the Perplexity SDK client."""
+        if self.config.api_key:
+            object.__setattr__(self, "_client", Perplexity(api_key=self.config.api_key))
 
     @classmethod
     def from_env(cls) -> "WebSearchClient":
@@ -70,7 +77,7 @@ class WebSearchClient:
         Returns:
             WebSearchResponse with results or error information
         """
-        if not self.config.api_key:
+        if not self.config.api_key or not self._client:
             return WebSearchResponse(
                 query=request.query,
                 node_id=request.node_id,
@@ -81,14 +88,7 @@ class WebSearchClient:
         try:
             response = self._call_api(request.query)
             return self._parse_response(response, request)
-        except requests.exceptions.Timeout:
-            return WebSearchResponse(
-                query=request.query,
-                node_id=request.node_id,
-                success=False,
-                error_message="Search request timed out",
-            )
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             return WebSearchResponse(
                 query=request.query,
                 node_id=request.node_id,
@@ -96,97 +96,47 @@ class WebSearchClient:
                 error_message=f"Search request failed: {str(e)}",
             )
 
-    def _call_api(self, query: str) -> dict:
-        """Make the actual API call to Perplexity."""
-        headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json",
-        }
+    def _call_api(self, query: str) -> SearchCreateResponse:
+        """Make the actual API call to Perplexity using SDK."""
+        if not self._client:
+            raise RuntimeError("Perplexity client not initialized")
 
-        payload = {
-            "model": self.config.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a research assistant. Provide factual information "
-                        "with source citations. Include URLs for all data points."
-                    ),
-                },
-                {"role": "user", "content": query},
-            ],
-            "return_citations": True,
-            "return_related_questions": False,
-        }
-
-        response = requests.post(
-            f"{self.config.base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=self.config.timeout,
+        # Use the Perplexity SDK search endpoint
+        response = self._client.search.create(
+            query=query,
+            max_results=self.config.max_results,
+            max_tokens=self.config.max_tokens,
+            max_tokens_per_page=self.config.max_tokens_per_page,
         )
-
-        # Handle HTTP errors
-        if response.status_code in (403, 404, 429, 500, 502, 503):
-            return {
-                "error": True,
-                "http_status": response.status_code,
-                "message": f"HTTP {response.status_code}: {response.reason}",
-            }
-
-        response.raise_for_status()
-        return response.json()
+        return response
 
     def _parse_response(
-        self, api_response: dict, request: WebSearchRequest
+        self, api_response: SearchCreateResponse, request: WebSearchRequest
     ) -> WebSearchResponse:
         """Parse the API response into a structured format."""
-        http_errors: List[str] = []
-
-        # Check for API-level errors
-        if api_response.get("error"):
-            http_errors.append(api_response.get("message", "Unknown error"))
-            return WebSearchResponse(
-                query=request.query,
-                node_id=request.node_id,
-                success=False,
-                error_message=api_response.get("message"),
-                http_errors=http_errors,
-            )
-
-        # Extract content and citations
+        # Extract search results from the Search API response
         results: List[SearchResultItem] = []
         raw_content = ""
-
         try:
-            choices = api_response.get("choices", [])
-            if choices:
-                message = choices[0].get("message", {})
-                raw_content = message.get("content", "")
+            # Access results directly from the typed response
+            for result in api_response.results:
+                # Build snippet from available content
+                snippet = result.snippet or ""
 
-            # Parse citations if available
-            citations = api_response.get("citations", [])
-            for i, citation in enumerate(citations[: self.config.max_results]):
-                if isinstance(citation, str):
-                    # Simple URL citation
-                    results.append(
-                        SearchResultItem(
-                            title=f"Source {i + 1}",
-                            url=citation,
-                            snippet="",
-                        )
+                # Add to raw content for context
+                if snippet:
+                    raw_content += f"{snippet}\n\n"
+
+                # Parse the search result using typed fields
+                results.append(
+                    SearchResultItem(
+                        title=result.title,
+                        url=result.url,
+                        snippet=snippet,
+                        published_date=result.date,  # Uses 'date' field from API
                     )
-                elif isinstance(citation, dict):
-                    # Structured citation
-                    results.append(
-                        SearchResultItem(
-                            title=citation.get("title", f"Source {i + 1}"),
-                            url=citation.get("url", ""),
-                            snippet=citation.get("snippet", ""),
-                            published_date=citation.get("published_date"),
-                        )
-                    )
-        except (KeyError, IndexError, TypeError) as e:
+                )
+        except (AttributeError, TypeError) as e:
             return WebSearchResponse(
                 query=request.query,
                 node_id=request.node_id,
@@ -198,7 +148,7 @@ class WebSearchClient:
             query=request.query,
             node_id=request.node_id,
             results=results,
-            raw_content=raw_content,
+            raw_content=raw_content.strip(),
             success=True,
             executed_at=datetime.now(),
         )

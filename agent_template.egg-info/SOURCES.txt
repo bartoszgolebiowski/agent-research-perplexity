@@ -30,7 +30,6 @@ src/skills/base.py
 src/skills/definitions.py
 src/skills/models.py
 src/tools/__init__.py
-src/tools/hello_world.py
 src/tools/input_validator.py
 src/tools/models.py
 src/tools/report_generator.py

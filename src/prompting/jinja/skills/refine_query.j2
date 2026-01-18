@@ -18,8 +18,12 @@ You are a search query optimization expert. The previous search attempt did not 
 
 ### Missing Fields to Target
 {% for field_name in missing_fields %}
-{% set field = current_node.extraction_fields | selectattr('name', 'equalto', field_name) | first %}
-- **{{ field_name }}**{% if field %}: {{ field.description }}{% endif %}
+{% set matching_fields = current_node.extraction_fields | selectattr('name', 'equalto', field_name) | list %}
+{% if matching_fields %}
+- **{{ field_name }}**: {{ matching_fields[0].description }}
+{% else %}
+- **{{ field_name }}**
+{% endif %}
 {% endfor %}
 
 ### Successfully Extracted (Reference)

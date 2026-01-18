@@ -3,7 +3,6 @@ from __future__ import annotations
 """Skill definitions used by the research workflow."""
 
 from .models import (
-    AnalyzeAndPlanSkillOutput,
     DiscoverEntitiesOutput,
     ExtractDataOutput,
     FormulateQueryOutput,
@@ -12,12 +11,6 @@ from .models import (
 )
 from .base import SkillDefinition, SkillName
 
-
-ANALYZE_AND_PLAN_SKILL = SkillDefinition(
-    name=SkillName.ANALYZE_AND_PLAN,
-    template_name="skills/analyze_and_plan.j2",
-    output_model=AnalyzeAndPlanSkillOutput,
-)
 
 # ---------------------------------------------------------------------------
 # ICP Intelligence System Skills
@@ -54,7 +47,6 @@ DISCOVER_ENTITIES_SKILL = SkillDefinition(
 )
 
 ALL_SKILLS = [
-    ANALYZE_AND_PLAN_SKILL,
     FORMULATE_QUERY_SKILL,
     EXTRACT_DATA_SKILL,
     VALIDATE_DATA_SKILL,

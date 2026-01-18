@@ -12,9 +12,6 @@ from ..prompting.environment import prompt_environment
 class SkillName(str, Enum):
     """LLM skill identifiers used by the coordinator."""
 
-    HELLO_WORLD = "hello_world"
-    ANALYZE_AND_PLAN = "analyze_and_plan"
-
     # ICP Intelligence System Skills
     FORMULATE_QUERY = "formulate_query"
     EXTRACT_DATA = "extract_data"

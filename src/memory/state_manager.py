@@ -8,14 +8,13 @@ from pydantic import BaseModel
 
 from src.skills.base import SkillName
 from src.skills.models import (
-    AnalyzeAndPlanSkillOutput,
     DiscoverEntitiesOutput,
     ExtractDataOutput,
     FormulateQueryOutput,
     RefineQueryOutput,
     ValidateDataOutput,
 )
-from src.tools.models import HelloWorldResponse, ToolName, WebSearchResponse
+from src.tools.models import ToolName, WebSearchResponse
 
 from .models import (
     AgentState,
@@ -98,18 +97,6 @@ def update_state_from_skill(
     return handler(state, output)
 
 
-def skill_analyze_and_plan_handler(
-    state: AgentState, output: AnalyzeAndPlanSkillOutput
-) -> AgentState:
-    """Handler for analyze and plan skill that updates workflow with analysis and plan."""
-    new_state = deepcopy(state)
-    # Advance to the recommended stage and record transition
-    new_state.workflow.record_transition(
-        to_stage=output.next_stage, reason=output.chain_of_thought
-    )
-    return new_state
-
-
 # ---------------------------------------------------------------------------
 # ICP Skill Handlers
 # ---------------------------------------------------------------------------
@@ -120,7 +107,6 @@ def skill_formulate_query_handler(
 ) -> AgentState:
     """Handler for query formulation skill."""
     new_state = deepcopy(state)
-
     # Store the formulated query in working memory
     new_state.working.current_search_query = output.search_query
     new_state.working.missing_fields = output.target_fields
@@ -239,7 +225,6 @@ def skill_discover_entities_handler(
 
 
 _SKILL_HANDLERS: Dict[SkillName, SkillHandler] = {
-    SkillName.ANALYZE_AND_PLAN: skill_analyze_and_plan_handler,  # type: ignore
     SkillName.FORMULATE_QUERY: skill_formulate_query_handler,  # type: ignore
     SkillName.EXTRACT_DATA: skill_extract_data_handler,  # type: ignore
     SkillName.VALIDATE_DATA: skill_validate_data_handler,  # type: ignore
@@ -257,15 +242,6 @@ def update_state_from_tool(
     if handler is None:
         raise ValueError(f"No handler registered for tool {tool}")
     return handler(state, output)
-
-
-def tool_welcome_handler(state: AgentState, output: HelloWorldResponse) -> AgentState:
-    """Example tool handler that updates the episodic memory with a welcome message."""
-    new_state = deepcopy(state)
-    new_state.workflow.record_transition(
-        to_stage=WorkflowStage.COORDINATOR, reason="Initial tool execution completed."
-    )
-    return new_state
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +308,6 @@ def tool_web_search_handler(state: AgentState, output: WebSearchResponse) -> Age
 
 
 _TOOL_HANDLERS: Dict[ToolName, ToolHandler] = {
-    ToolName.HELLO_WORLD: tool_welcome_handler,  # type: ignore
     ToolName.WEB_SEARCH: tool_web_search_handler,  # type: ignore
 }
 

@@ -1,136 +1,369 @@
 {
-  "name": "Tech Company Analysis - Example",
-  "description": "Example ICP analysis for demonstrating the system capabilities",
+  "id": "ICP-2025-TT-ANALYSIS-001",
+  "name": "Transition Technologies S.A. Analysis",
+  "description": "Analysis of Transition Technologies S.A. (tt.com.pl). Fiscal Year Focus: 2024/2025",
+  "created_at": "2026-01-18T12:00:00",
   "global_constraints": {
     "currency": "USD",
-    "language": "en",
-    "target_years": [2024, 2025],
-    "allowed_regions": ["North America", "Europe"]
+    "language": "PL",
+    "date_format": "%Y-%m-%d",
+    "target_years": [
+      2024,
+      2025
+    ],
+    "allowed_regions": [],
+    "custom_parameters": {
+      "max_data_age": "12 months",
+      "fiscal_year_focus": "2024/2025",
+      "target_name": "Transition Technologies S.A.",
+      "target_domain": "tt.com.pl"
+    }
   },
   "root_nodes": [
     {
-      "name": "Company Overview",
-      "description": "Research the company's basic information, founding date, headquarters, and mission statement",
+      "id": "financial_overview",
+      "name": "Financial Overview",
+      "description": "Kompleksowa analiza finansowa Transition Technologies (Grupa Kapitałowa) na podstawie raportów rocznych.",
+      "status": "pending",
+      "extraction_fields": [],
+      "parameters": {
+        "entity_type": "Group/Consolidated"
+      },
+      "sub_tasks": [
+        {
+          "id": "revenue_figures",
+          "name": "Revenue Figures",
+          "description": "Pobierz roczny przychód grupy (najlepiej USD) oraz rok fiskalny.",
+          "status": "pending",
+          "extraction_fields": [
+            {
+              "name": "Total Annual Revenue",
+              "description": "Total Annual Revenue",
+              "priority": "must_have",
+              "data_type": "currency",
+              "unit": "USD"
+            },
+            {
+              "name": "Fiscal Year",
+              "description": "Fiscal Year",
+              "priority": "must_have",
+              "data_type": "string"
+            },
+            {
+              "name": "Currency",
+              "description": "Currency",
+              "priority": "must_have",
+              "data_type": "string"
+            }
+          ],
+          "parameters": {},
+          "sub_tasks": []
+        },
+        {
+          "id": "revenue_breakdown",
+          "name": "Revenue Breakdown",
+          "description": "Rozbicie przychodu na obszary (licencje, usługi, hardware, spółki zależne) i regiony.",
+          "status": "pending",
+          "extraction_fields": [
+            {
+              "name": "Revenue by Segment",
+              "description": "Revenue by Segment",
+              "priority": "nice_to_have",
+              "data_type": "string"
+            },
+            {
+              "name": "Revenue by Region",
+              "description": "Revenue by Region",
+              "priority": "nice_to_have",
+              "data_type": "string"
+            },
+            {
+              "name": "Revenue by Subsidiary",
+              "description": "Revenue by Subsidiary",
+              "priority": "nice_to_have",
+              "data_type": "string"
+            }
+          ],
+          "parameters": {},
+          "sub_tasks": []
+        },
+        {
+          "id": "revenue_growth",
+          "name": "Revenue Growth",
+          "description": "Oblicz lub pobierz zmianę procentową przychodu r/r (2024 vs 2023).",
+          "status": "pending",
+          "extraction_fields": [
+            {
+              "name": "Revenue Growth YoY (%)",
+              "description": "Revenue Growth YoY (%)",
+              "priority": "must_have",
+              "data_type": "number",
+              "unit": "%"
+            },
+            {
+              "name": "Historical Revenue Data (last 3 years)",
+              "description": "Historical Revenue Data (last 3 years)",
+              "priority": "must_have",
+              "data_type": "list"
+            }
+          ],
+          "parameters": {},
+          "sub_tasks": []
+        },
+        {
+          "id": "profitability_indicators",
+          "name": "Profitability Indicators",
+          "description": "Wskaźniki rentowności grupy.",
+          "status": "pending",
+          "extraction_fields": [
+            {
+              "name": "EBITDA",
+              "description": "EBITDA",
+              "priority": "must_have",
+              "data_type": "currency",
+              "unit": "USD"
+            },
+            {
+              "name": "Net Profit",
+              "description": "Net Profit",
+              "priority": "must_have",
+              "data_type": "currency",
+              "unit": "USD"
+            },
+            {
+              "name": "Gross Profit",
+              "description": "Gross Profit",
+              "priority": "must_have",
+              "data_type": "currency",
+              "unit": "USD"
+            },
+            {
+              "name": "Profitability by Segment",
+              "description": "Profitability by Segment",
+              "priority": "must_have",
+              "data_type": "string"
+            }
+          ],
+          "parameters": {},
+          "sub_tasks": []
+        }
+      ]
+    },
+    {
+      "id": "corporate_structure",
+      "name": "Corporate Structure",
+      "description": "Analiza zarządu i struktury właścicielskiej Grupy Transition Technologies.",
+      "status": "pending",
       "extraction_fields": [
         {
-          "name": "company_name",
-          "description": "Official legal name of the company",
+          "name": "Headquarters Location",
+          "description": "Headquarters Location",
           "priority": "must_have",
           "data_type": "string"
         },
         {
-          "name": "founding_date",
-          "description": "Date the company was founded",
-          "priority": "must_have",
-          "data_type": "date"
-        },
-        {
-          "name": "headquarters",
-          "description": "Location of company headquarters",
+          "name": "CEO (Prezes Zarządu)",
+          "description": "CEO (Prezes Zarządu)",
           "priority": "must_have",
           "data_type": "string"
         },
         {
-          "name": "employee_count",
-          "description": "Approximate number of employees",
+          "name": "Board of Directors",
+          "description": "Board of Directors",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "Ownership Structure",
+          "description": "Ownership Structure",
+          "priority": "must_have",
+          "data_type": "string"
+        },
+        {
+          "name": "Subsidiary Names List",
+          "description": "Subsidiary Names List",
+          "priority": "must_have",
+          "data_type": "list"
+        }
+      ],
+      "parameters": {},
+      "sub_tasks": []
+    },
+    {
+      "id": "business_model",
+      "name": "Business Model",
+      "description": "Analiza oferty, rynku i pozycjonowania Grupy TT (usługi IT, energetyka, przemysł).",
+      "status": "pending",
+      "extraction_fields": [
+        {
+          "name": "Core Services",
+          "description": "Core Services",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "Key Products",
+          "description": "Key Products",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "Target Markets",
+          "description": "Target Markets",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "Industry Rankings",
+          "description": "Industry Rankings",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "Value Proposition",
+          "description": "Value Proposition",
+          "priority": "must_have",
+          "data_type": "string"
+        }
+      ],
+      "parameters": {},
+      "sub_tasks": []
+    },
+    {
+      "id": "rd_capabilities",
+      "name": "R&D Capabilities",
+      "description": "Analiza centrów R&D i inżynierii w strukturach grupy.",
+      "status": "pending",
+      "extraction_fields": [
+        {
+          "name": "R&D Locations",
+          "description": "R&D Locations",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "Headcount per Center",
+          "description": "Headcount per Center",
+          "priority": "must_have",
+          "data_type": "string"
+        },
+        {
+          "name": "Specialization per Center",
+          "description": "Specialization per Center",
+          "priority": "must_have",
+          "data_type": "string"
+        }
+      ],
+      "parameters": {},
+      "sub_tasks": [
+        {
+          "id": "rd_investment",
+          "name": "R&D Investment",
+          "description": "Poziom inwestycji / koszty ponoszone na centra R&D.",
+          "status": "pending",
+          "extraction_fields": [
+            {
+              "name": "R&D Expenditure",
+              "description": "R&D Expenditure",
+              "priority": "nice_to_have",
+              "data_type": "currency",
+              "unit": "USD"
+            },
+            {
+              "name": "Investment per Center",
+              "description": "Investment per Center",
+              "priority": "nice_to_have",
+              "data_type": "currency",
+              "unit": "USD"
+            }
+          ],
+          "parameters": {},
+          "sub_tasks": []
+        }
+      ]
+    },
+    {
+      "id": "talent_acquisition",
+      "name": "Talent Acquisition",
+      "description": "Analiza ofert pracy Transition Technologies w obszarze Software Development.",
+      "status": "pending",
+      "extraction_fields": [
+        {
+          "name": "Job Count per Location",
+          "description": "Job Count per Location",
+          "priority": "must_have",
+          "data_type": "number"
+        },
+        {
+          "name": "Required Seniority Levels",
+          "description": "Required Seniority Levels",
+          "priority": "must_have",
+          "data_type": "list"
+        },
+        {
+          "name": "Required Experience (Years)",
+          "description": "Required Experience (Years)",
+          "priority": "must_have",
+          "data_type": "string"
+        },
+        {
+          "name": "Top 3 Qualifications per Role",
+          "description": "Top 3 Qualifications per Role",
+          "priority": "must_have",
+          "data_type": "list"
+        }
+      ],
+      "parameters": {
+        "target_roles": [
+          "Developer",
+          "Frontend Developer",
+          "Backend Developer",
+          "DevOps Engineer",
+          "Cloud Engineer",
+          "Product Owner (PO)",
+          "Scrum Master (SM)",
+          "Project Manager (PM)"
+        ],
+        "context": "Focus only on Software Development roles."
+      },
+      "sub_tasks": []
+    },
+    {
+      "id": "network_analysis",
+      "name": "Network Analysis",
+      "description": "Analiza powiązań na LinkedIn pomiędzy pracownikami TTPSC a kadrą zarządzającą Transition Technologies (Grupa).",
+      "status": "pending",
+      "extraction_fields": [
+        {
+          "name": "Common Connections",
+          "description": "Common Connections",
+          "priority": "nice_to_have",
+          "data_type": "number"
+        },
+        {
+          "name": "Direct Connections",
+          "description": "Direct Connections",
           "priority": "nice_to_have",
           "data_type": "number"
         }
       ],
       "parameters": {
-        "company": "Microsoft Corporation"
+        "target_decision_makers": [
+          "Chief Technology Officer (CTO)",
+          "Chief Product Officer (CPO)",
+          "Executive Vice President (EVP)",
+          "VP of Product",
+          "Head of Product",
+          "Product Director",
+          "Group Product Manager",
+          "Senior Product Manager",
+          "Product Manager",
+          "Director of Operations",
+          "Director of Engineering"
+        ],
+        "source_platform": "LinkedIn"
       },
-      "max_retries": 3,
-      "sub_tasks": [
-        {
-          "name": "Financial Metrics",
-          "description": "Find the company's key financial metrics including revenue and market cap",
-          "extraction_fields": [
-            {
-              "name": "annual_revenue",
-              "description": "Most recent fiscal year total revenue",
-              "priority": "must_have",
-              "data_type": "currency",
-              "unit": "USD"
-            },
-            {
-              "name": "market_cap",
-              "description": "Current market capitalization",
-              "priority": "must_have",
-              "data_type": "currency",
-              "unit": "USD"
-            },
-            {
-              "name": "net_income",
-              "description": "Most recent fiscal year net income",
-              "priority": "nice_to_have",
-              "data_type": "currency",
-              "unit": "USD"
-            }
-          ],
-          "parameters": {
-            "company": "Microsoft Corporation",
-            "fiscal_year": 2024
-          },
-          "max_retries": 3
-        },
-        {
-          "name": "Leadership Team",
-          "description": "Identify key executives and their roles",
-          "extraction_fields": [
-            {
-              "name": "ceo_name",
-              "description": "Name of the Chief Executive Officer",
-              "priority": "must_have",
-              "data_type": "string"
-            },
-            {
-              "name": "cfo_name",
-              "description": "Name of the Chief Financial Officer",
-              "priority": "nice_to_have",
-              "data_type": "string"
-            },
-            {
-              "name": "cto_name",
-              "description": "Name of the Chief Technology Officer",
-              "priority": "nice_to_have",
-              "data_type": "string"
-            }
-          ],
-          "parameters": {
-            "company": "Microsoft Corporation"
-          },
-          "max_retries": 2
-        }
-      ]
-    },
-    {
-      "name": "Product Analysis",
-      "description": "Research the company's main products and services",
-      "extraction_fields": [
-        {
-          "name": "main_products",
-          "description": "List of primary products or services",
-          "priority": "must_have",
-          "data_type": "list"
-        },
-        {
-          "name": "flagship_product",
-          "description": "The company's most significant product",
-          "priority": "must_have",
-          "data_type": "string"
-        },
-        {
-          "name": "product_categories",
-          "description": "Categories of products/services offered",
-          "priority": "nice_to_have",
-          "data_type": "list"
-        }
-      ],
-      "parameters": {
-        "company": "Microsoft Corporation"
-      },
-      "max_retries": 2
+      "sub_tasks": []
     }
   ]
 }

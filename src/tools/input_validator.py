@@ -33,7 +33,7 @@ class ValidationRequest(BaseModel):
 class ValidationResponse(BaseModel):
     """Response model from input validation tool."""
 
-    success: bool = Field(..., description="Whether validation succeeded")
+    success: bool = Field(default=False, description="Whether validation succeeded")
     analysis_input: Optional[ICPAnalysisInput] = Field(
         default=None, description="Parsed input if validation succeeded"
     )

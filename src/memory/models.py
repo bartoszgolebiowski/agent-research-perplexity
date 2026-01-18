@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from src.tools.models import HelloWorldRequest, WebSearchRequest
+from src.tools.models import WebSearchRequest
 from src.engine.types import AnalysisNodeStatus, FieldPriority, WorkflowStage
 
 
@@ -18,9 +18,9 @@ from src.engine.types import AnalysisNodeStatus, FieldPriority, WorkflowStage
 class ExtractionField(BaseModel):
     """Defines a specific field to extract during analysis."""
 
-    name: str = Field(..., description="Name of the field to extract")
+    name: str = Field(default="", description="Name of the field to extract")
     description: str = Field(
-        ..., description="Human-readable description of what to find"
+        default="", description="Human-readable description of what to find"
     )
     priority: FieldPriority = Field(
         default=FieldPriority.MUST_HAVE, description="Priority level of this field"
@@ -38,13 +38,13 @@ class ExtractedDataPoint(BaseModel):
     """A single extracted data point with citation."""
 
     field_name: str = Field(
-        ..., description="Name of the extraction field this satisfies"
+        default="", description="Name of the extraction field this satisfies"
     )
-    value: Any = Field(..., description="Extracted value")
+    value: Any = Field(default=None, description="Extracted value")
     raw_value: Optional[str] = Field(
         default=None, description="Original value before normalization"
     )
-    source_url: str = Field(..., description="Citation URL for this data point")
+    source_url: str = Field(default="", description="Citation URL for this data point")
     confidence: float = Field(
         default=1.0, ge=0.0, le=1.0, description="Confidence score for this extraction"
     )
@@ -85,7 +85,9 @@ class AnalysisNode(BaseModel):
         default_factory=lambda: str(uuid4()),
         description="Unique identifier for this node",
     )
-    name: str = Field(..., description="Human-readable name for this analysis task")
+    name: str = Field(
+        default="", description="Human-readable name for this analysis task"
+    )
     description: str = Field(
         default="", description="Context for the LLM - describes what to research"
     )
@@ -185,7 +187,7 @@ class ICPAnalysisInput(BaseModel):
         default_factory=lambda: str(uuid4()),
         description="Unique identifier for this analysis job",
     )
-    name: str = Field(..., description="Name of the analysis job")
+    name: str = Field(default="", description="Name of the analysis job")
     description: Optional[str] = Field(
         default=None, description="Optional description of the overall analysis"
     )
@@ -231,7 +233,9 @@ class ICPAnalysisOutput(BaseModel):
     This is serialized to JSON for report generation.
     """
 
-    input: ICPAnalysisInput = Field(..., description="Original input specification")
+    input: ICPAnalysisInput = Field(
+        default_factory=ICPAnalysisInput, description="Original input specification"
+    )
     completed_at: datetime = Field(
         default_factory=datetime.now, description="Timestamp when analysis completed"
     )
@@ -329,7 +333,9 @@ class WorkflowMemory(BaseModel):
     current_stage: WorkflowStage = Field(
         default=WorkflowStage.INITIAL, description="Current stage in the workflow"
     )
-    goal: str = Field(..., description="The initial goal that started the workflow.")
+    goal: str = Field(
+        default="", description="The initial goal that started the workflow."
+    )
     history: List[WorkflowTransition] = Field(
         default_factory=list, description="Historical record of stage transitions."
     )
@@ -425,10 +431,6 @@ class AgentState(BaseModel):
     icp_queue: Optional[Any] = Field(
         default=None, description="The analysis queue for ICP workflow"
     )
-
-    def get_hello_world_request(self) -> HelloWorldRequest:
-        """Constructs a HelloWorldRequest from the agent state."""
-        return HelloWorldRequest(query="Hello, World!")
 
     def get_web_search_request(self) -> WebSearchRequest:
         """Constructs a WebSearchRequest from the agent state."""

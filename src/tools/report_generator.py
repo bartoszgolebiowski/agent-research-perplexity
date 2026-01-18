@@ -18,7 +18,8 @@ class ReportRequest(BaseModel):
     """Request model for report generation tool."""
 
     analysis_output: ICPAnalysisOutput = Field(
-        ..., description="The completed analysis output to generate report from"
+        default_factory=ICPAnalysisOutput,
+        description="The completed analysis output to generate report from",
     )
     output_directory: Path = Field(
         default=Path("./reports"), description="Directory to write reports to"
@@ -35,8 +36,12 @@ class ReportRequest(BaseModel):
 class ReportResponse(BaseModel):
     """Response model from report generation tool."""
 
-    html_path: Path = Field(..., description="Path to generated HTML report")
-    json_path: Path = Field(..., description="Path to exported JSON data")
+    html_path: Path = Field(
+        default=Path("./reports"), description="Path to generated HTML report"
+    )
+    json_path: Path = Field(
+        default=Path("./reports"), description="Path to exported JSON data"
+    )
     generated_at: datetime = Field(
         default_factory=datetime.now, description="Timestamp of report generation"
     )
