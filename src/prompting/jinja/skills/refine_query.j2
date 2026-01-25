@@ -47,6 +47,14 @@ No results from previous search.
 - **Currency:** {{ global_constraints.currency }}
 - **Target Years:** {{ global_constraints.target_years | join(", ") }}
 
+### Target Entity
+{% if global_constraints.custom_parameters.target_name %}
+- **Company/Entity Name:** {{ global_constraints.custom_parameters.target_name }}
+{% endif %}
+{% if global_constraints.custom_parameters.target_domain %}
+- **Website Domain:** {{ global_constraints.custom_parameters.target_domain }}
+{% endif %}
+
 ### Instructions
 
 1. **Analyze** why the previous query failed to find the missing fields
@@ -55,10 +63,13 @@ No results from previous search.
    - Missing key terms or context?
    - Wrong data source type?
 3. **Formulate** a refined query that:
+   - **ALWAYS includes the target entity name** ({{ global_constraints.custom_parameters.target_name | default('company name') }})
    - Specifically targets the missing fields
    - Uses alternative terminology or phrasing
    - May target different source types (e.g., press releases, SEC filings, news)
 4. **Document** your refinement strategy
+
+**CRITICAL:** Every refined query MUST prominently include "{{ global_constraints.custom_parameters.target_name | default('the target entity name') }}" to avoid generic results.
 
 ### Refinement Strategies to Consider
 

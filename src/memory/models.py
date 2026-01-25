@@ -65,6 +65,9 @@ class AnalysisNodeResult(BaseModel):
     search_queries_used: List[str] = Field(
         default_factory=list, description="Search queries that were executed"
     )
+    raw_source_content: Optional[str] = Field(
+        default=None, description="Raw text content used for this analysis"
+    )
     error_message: Optional[str] = Field(
         default=None, description="Error message if processing failed"
     )
@@ -108,11 +111,18 @@ class AnalysisNode(BaseModel):
     max_retries: int = Field(
         default=3, description="Maximum retry attempts for this node"
     )
+    search_count: int = Field(default=0, description="Number of web searches performed")
+    max_searches: int = Field(
+        default=4, description="Maximum web search invocations for this node"
+    )
     result: Optional[AnalysisNodeResult] = Field(
         default=None, description="Results after processing"
     )
     parent_id: Optional[str] = Field(
         default=None, description="ID of parent node (for dynamic expansion)"
+    )
+    depth: int = Field(
+        default=0, description="Recursion depth of this node in the analysis tree"
     )
     created_at: datetime = Field(
         default_factory=datetime.now, description="Node creation timestamp"
@@ -155,6 +165,9 @@ class AnalysisNode(BaseModel):
 class GlobalConstraints(BaseModel):
     """Global constraints applied to all analysis tasks."""
 
+    max_depth: int = Field(
+        default=3, description="Maximum allowed recursion depth for dynamic expansion"
+    )
     currency: str = Field(
         default="USD", description="Target currency for financial data normalization"
     )
@@ -297,8 +310,8 @@ class WorkingMemory(BaseModel):
     current_node_id: Optional[str] = Field(
         default=None, description="ID of the currently processing analysis node"
     )
-    current_search_query: Optional[str] = Field(
-        default=None, description="The current search query being executed"
+    current_search_queries: List[str] = Field(
+        default_factory=list, description="The current search queries being executed"
     )
     current_search_results: Optional[Any] = Field(
         default=None, description="Results from the most recent search"
@@ -434,11 +447,11 @@ class AgentState(BaseModel):
 
     def get_web_search_request(self) -> WebSearchRequest:
         """Constructs a WebSearchRequest from the agent state."""
-        if not self.working.current_node_id or not self.working.current_search_query:
-            raise ValueError("No current node or search query set")
+        if not self.working.current_node_id or not self.working.current_search_queries:
+            raise ValueError("No current node or search queries set")
 
         return WebSearchRequest(
-            query=self.working.current_search_query,
+            queries=self.working.current_search_queries,
             node_id=self.working.current_node_id,
             target_fields=self.working.missing_fields,
             attempt_number=self._get_current_attempt_number(),
@@ -457,3 +470,22 @@ class AgentState(BaseModel):
         if self.icp_queue and self.working.current_node_id:
             return self.icp_queue.get_node(self.working.current_node_id)
         return None
+
+    def save_snapshot(self, filepath: str) -> None:
+        """Save the agent state to a JSON file for persistence."""
+        # Create a copy without the queue for serialization
+        state_dict = self.model_dump()
+        state_dict.pop("icp_queue", None)  # Remove non-serializable queue
+        import json
+
+        with open(filepath, "w") as f:
+            json.dump(state_dict, f, default=str, indent=2)
+
+    @classmethod
+    def load_snapshot(cls, filepath: str) -> "AgentState":
+        """Load agent state from a JSON file."""
+        import json
+
+        with open(filepath, "r") as f:
+            state_dict = json.load(f)
+        return cls(**state_dict)

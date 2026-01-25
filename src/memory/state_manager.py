@@ -8,11 +8,9 @@ from pydantic import BaseModel
 
 from src.skills.base import SkillName
 from src.skills.models import (
-    DiscoverEntitiesOutput,
-    ExtractDataOutput,
     FormulateQueryOutput,
+    ProcessSearchResultsOutput,
     RefineQueryOutput,
-    ValidateDataOutput,
 )
 from src.tools.models import ToolName, WebSearchResponse
 
@@ -26,7 +24,7 @@ from .models import (
     WorkflowMemory,
     WorkingMemory,
 )
-from src.engine.types import WorkflowStage
+from src.engine.types import AnalysisNodeStatus, WorkflowStage
 
 SkillHandler = Callable[[AgentState, BaseModel], AgentState]
 ToolHandler = Callable[[AgentState, BaseModel], AgentState]
@@ -107,8 +105,10 @@ def skill_formulate_query_handler(
 ) -> AgentState:
     """Handler for query formulation skill."""
     new_state = deepcopy(state)
-    # Store the formulated query in working memory
-    new_state.working.current_search_query = output.search_query
+    # Store the formulated queries in working memory
+    new_state.working.current_search_queries = [
+        output.search_query
+    ] + output.alternative_queries
     new_state.working.missing_fields = output.target_fields
 
     # Advance to search execution stage
@@ -120,72 +120,14 @@ def skill_formulate_query_handler(
     return new_state
 
 
-def skill_extract_data_handler(
-    state: AgentState, output: ExtractDataOutput
-) -> AgentState:
-    """Handler for data extraction skill."""
-    new_state = deepcopy(state)
-
-    # Store extracted data in working memory
-    new_state.working.current_extracted_data = output
-    new_state.working.missing_fields = output.missing_fields
-
-    # Log extraction in episodic memory
-    new_state.episodic.extraction_history.append(
-        {
-            "node_id": new_state.working.current_node_id,
-            "timestamp": datetime.now().isoformat(),
-            "extracted_count": len(output.extracted_fields),
-            "missing_count": len(output.missing_fields),
-        }
-    )
-
-    # Advance to validation stage
-    new_state.workflow.record_transition(
-        to_stage=WorkflowStage.ICP_VALIDATE_DATA,
-        reason=output.chain_of_thought,
-    )
-
-    return new_state
-
-
-def skill_validate_data_handler(
-    state: AgentState, output: ValidateDataOutput
-) -> AgentState:
-    """Handler for data validation skill."""
-    new_state = deepcopy(state)
-
-    # Store validation result
-    new_state.working.current_validation_result = output
-    new_state.working.missing_fields = output.missing_must_have
-
-    # Route to appropriate next stage based on recommendation
-    if output.recommended_action == "proceed":
-        next_stage = WorkflowStage.ICP_DISCOVER_ENTITIES
-    elif output.recommended_action == "retry":
-        next_stage = WorkflowStage.ICP_REFINE_QUERY
-        new_state.working.retry_reason = output.validation_notes
-    elif output.recommended_action == "partial":
-        next_stage = WorkflowStage.ICP_NODE_PARTIAL
-    else:  # fail
-        next_stage = WorkflowStage.ICP_NODE_FAILED
-
-    new_state.workflow.record_transition(
-        to_stage=next_stage,
-        reason=output.validation_notes,
-    )
-
-    return new_state
-
-
 def skill_refine_query_handler(
     state: AgentState, output: RefineQueryOutput
 ) -> AgentState:
     """Handler for query refinement skill (retry flow)."""
     new_state = deepcopy(state)
 
-    # Update the search query with refined version
-    new_state.working.current_search_query = output.refined_query
+    # Update the search queries with refined version
+    new_state.working.current_search_queries = [output.refined_query]
     new_state.working.missing_fields = output.focus_fields
     new_state.working.retry_reason = output.failure_analysis
 
@@ -198,27 +140,105 @@ def skill_refine_query_handler(
     return new_state
 
 
-def skill_discover_entities_handler(
-    state: AgentState, output: DiscoverEntitiesOutput
+def skill_process_results_handler(
+    state: AgentState, output: ProcessSearchResultsOutput
 ) -> AgentState:
-    """Handler for entity discovery skill."""
+    """
+    Handler for the merged PROCESS_RESULTS skill.
+
+    This handler processes extraction, validation, and discovery in one shot,
+    then routes to the appropriate next stage based on the combined output.
+    It also enforces depth limits for dynamic expansion.
+    """
+    from .queue import AnalysisQueue
+    from .models import AnalysisNode
+
     new_state = deepcopy(state)
 
-    if output.should_expand and output.discovered_entities:
+    # 1. Store raw source content immediately for permanent record
+    raw_content = ""
+    if new_state.working.current_search_results:
+        raw_content = getattr(
+            new_state.working.current_search_results, "raw_content", ""
+        )
+
+    # 2. Process Extraction: Store extracted data in working memory
+    new_state.working.current_extracted_data = output
+    new_state.working.missing_fields = output.missing_fields
+
+    # Log extraction in episodic memory
+    new_state.episodic.extraction_history.append(
+        {
+            "node_id": new_state.working.current_node_id,
+            "timestamp": datetime.now().isoformat(),
+            "extracted_count": len(output.extracted_fields),
+            "missing_count": len(output.missing_fields),
+            "is_complete": output.is_complete,
+            "recommended_action": output.recommended_action,
+        }
+    )
+
+    # 3. Process Validation: Route based on recommended_action
+    if output.recommended_action == "retry":
+        new_state.working.retry_reason = output.chain_of_thought
+        new_state.workflow.record_transition(
+            to_stage=WorkflowStage.ICP_REFINE_QUERY,
+            reason=f"Retry needed: missing {output.retry_focus}",
+        )
+        return new_state
+
+    if output.recommended_action == "fail":
+        new_state.workflow.record_transition(
+            to_stage=WorkflowStage.ICP_NODE_FAILED,
+            reason="Validation failed after exhausting options",
+        )
+        return new_state
+
+    if output.recommended_action == "partial":
+        # Store validation result
+        new_state.working.current_validation_result = {
+            "is_complete": output.is_complete,
+            "recommended_action": output.recommended_action,
+        }
+        new_state.workflow.record_transition(
+            to_stage=WorkflowStage.ICP_NODE_PARTIAL,
+            reason="Partial data extracted",
+        )
+        return new_state
+
+    # 4. Process Expansion (only if proceeding and entities discovered)
+    # Enforce depth limit
+    current_node = new_state.get_current_node()
+    global_constraints = new_state.semantic.global_constraints or {}
+    max_depth = global_constraints.get("max_depth", 3)
+    current_depth = getattr(current_node, "depth", 0) if current_node else 0
+
+    can_expand = (
+        output.should_expand
+        and output.discovered_entities
+        and current_depth < max_depth
+    )
+
+    if can_expand:
         # Store discovered entities for tree expansion
         new_state.working.query_analysis = {
             "discovered_entities": output.discovered_entities,
-            "discovery_notes": output.discovery_notes,
+            "discovery_notes": output.chain_of_thought,
         }
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_EXPAND_TREE,
-            reason=output.discovery_notes,
+            reason=f"Discovered {len(output.discovered_entities)} entities at depth {current_depth}",
         )
     else:
-        # No expansion needed, mark node complete
+        # No expansion (either not requested, no entities, or depth limit reached)
+        reason = "Data complete"
+        if output.should_expand and current_depth >= max_depth:
+            reason = (
+                f"Data complete (depth limit {max_depth} reached, skipping expansion)"
+            )
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_NODE_COMPLETE,
-            reason="No new entities discovered",
+            reason=reason,
         )
 
     return new_state
@@ -226,10 +246,8 @@ def skill_discover_entities_handler(
 
 _SKILL_HANDLERS: Dict[SkillName, SkillHandler] = {
     SkillName.FORMULATE_QUERY: skill_formulate_query_handler,  # type: ignore
-    SkillName.EXTRACT_DATA: skill_extract_data_handler,  # type: ignore
-    SkillName.VALIDATE_DATA: skill_validate_data_handler,  # type: ignore
     SkillName.REFINE_QUERY: skill_refine_query_handler,  # type: ignore
-    SkillName.DISCOVER_ENTITIES: skill_discover_entities_handler,  # type: ignore
+    SkillName.PROCESS_RESULTS: skill_process_results_handler,  # type: ignore
 }
 
 
@@ -260,11 +278,16 @@ def tool_web_search_handler(state: AgentState, output: WebSearchResponse) -> Age
     new_state.resource.api_calls_made += 1
     new_state.resource.last_api_call_time = output.executed_at
 
+    # Increment search count on the current node
+    current_node = new_state.get_current_node()
+    if current_node:
+        current_node.search_count += 1
+
     # Log search in episodic memory
     new_state.episodic.search_history.append(
         {
             "node_id": output.node_id,
-            "query": output.query,
+            "queries": output.queries,
             "timestamp": output.executed_at.isoformat(),
             "result_count": len(output.results),
             "success": output.success,
@@ -285,9 +308,13 @@ def tool_web_search_handler(state: AgentState, output: WebSearchResponse) -> Age
             }
         )
 
-        # Check if we can retry
+        # Check if we can retry or if we've hit the search limit
         current_node = new_state.get_current_node()
-        if current_node and current_node.can_retry():
+        if (
+            current_node
+            and current_node.can_retry()
+            and current_node.search_count < current_node.max_searches
+        ):
             new_state.workflow.record_transition(
                 to_stage=WorkflowStage.ICP_REFINE_QUERY,
                 reason=f"Search failed: {output.error_message}. Attempting retry.",
@@ -295,12 +322,12 @@ def tool_web_search_handler(state: AgentState, output: WebSearchResponse) -> Age
         else:
             new_state.workflow.record_transition(
                 to_stage=WorkflowStage.ICP_NODE_FAILED,
-                reason=f"Search failed and no retries remaining: {output.error_message}",
+                reason=f"Search failed and no retries remaining or search limit reached: {output.error_message}",
             )
     else:
-        # Search succeeded, proceed to extraction
+        # Search succeeded, proceed to merged processing skill
         new_state.workflow.record_transition(
-            to_stage=WorkflowStage.ICP_EXTRACT_DATA,
+            to_stage=WorkflowStage.ICP_PROCESS_RESULTS,
             reason=f"Search returned {len(output.results)} results",
         )
 
@@ -326,7 +353,7 @@ def handle_queue_next(state: AgentState) -> AgentState:
 
     # Clear working memory
     new_state.working.current_node_id = None
-    new_state.working.current_search_query = None
+    new_state.working.current_search_queries = []
     new_state.working.current_search_results = None
     new_state.working.current_extracted_data = None
     new_state.working.current_validation_result = None
@@ -387,6 +414,17 @@ def handle_node_done(state: AgentState) -> AgentState:
 
         new_state.workflow.nodes_processed += 1
 
+        # Save snapshot after node completion
+        import os
+
+        snapshot_dir = "snapshots"
+        os.makedirs(snapshot_dir, exist_ok=True)
+        timestamp = datetime.now().isoformat().replace(":", "-")
+        snapshot_path = os.path.join(
+            snapshot_dir, f"snapshot_{node_id}_{timestamp}.json"
+        )
+        new_state.save_snapshot(snapshot_path)
+
     # Transition to get next node
     new_state.workflow.record_transition(
         to_stage=WorkflowStage.ICP_QUEUE_READY,
@@ -416,9 +454,12 @@ def handle_expand_tree(state: AgentState, enable_expansion: bool = True) -> Agen
         queue: AnalysisQueue = new_state.icp_queue  # type: ignore
 
         for entity in discovery_data["discovered_entities"]:
+            if not entity.get("extraction_fields"):
+                continue  # Skip entities without fields to prevent empty node loops
             new_node = AnalysisNode(
                 name=entity.get("name", "Discovered Entity"),
                 description=entity.get("description", ""),
+                extraction_fields=entity.get("extraction_fields", []),
                 parameters={"entity_type": entity.get("entity_type", "unknown")},
             )
             queue.add_dynamic_node(new_node, parent_id)
@@ -465,14 +506,13 @@ def _store_node_result(
         return
 
     extracted_data = state.working.current_extracted_data
-    search_query = state.working.current_search_query
+    search_queries = state.working.current_search_queries
 
     extracted_points: list[ExtractedDataPoint] = []
     missing_fields: list[str] = []
     queries_used: list[str] = []
 
-    if search_query:
-        queries_used.append(search_query)
+    queries_used.extend(search_queries)
 
     if extracted_data and hasattr(extracted_data, "extracted_fields"):
         for ef in extracted_data.extracted_fields:
@@ -488,10 +528,16 @@ def _store_node_result(
             )
         missing_fields = extracted_data.missing_fields
 
+    # Capture raw content before it's cleared for permanent storage
+    raw_content: str = ""
+    if state.working.current_search_results:
+        raw_content = getattr(state.working.current_search_results, "raw_content", "")
+
     node.result = AnalysisNodeResult(
         extracted_data=extracted_points,
         missing_fields=missing_fields,
         search_queries_used=queries_used,
+        raw_source_content=raw_content,
         completed_at=datetime.now(),
     )
     node.status = status
@@ -500,6 +546,7 @@ def _store_node_result(
         "status": status.value,
         "data": [dp.model_dump() for dp in extracted_points],
         "missing": missing_fields,
+        "raw_source_content": raw_content,
     }
 
 

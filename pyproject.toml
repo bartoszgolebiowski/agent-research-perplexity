@@ -14,6 +14,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "openai>=1.13.3",
     "requests>=2.31",
+    "perplexity>=0.1.0",
 ]
 
 [project.scripts]

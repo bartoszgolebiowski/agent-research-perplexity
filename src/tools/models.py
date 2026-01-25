@@ -33,7 +33,9 @@ class SearchResultItem(BaseModel):
 class WebSearchRequest(BaseModel):
     """Request model for web search tool."""
 
-    query: str = Field(default="", description="The search query to execute")
+    queries: List[str] = Field(
+        default_factory=list, description="The search queries to execute"
+    )
     node_id: str = Field(
         default="", description="ID of the analysis node this search is for"
     )
@@ -51,7 +53,9 @@ class WebSearchRequest(BaseModel):
 class WebSearchResponse(BaseModel):
     """Response model from web search tool."""
 
-    query: str = Field(default="", description="The executed search query")
+    queries: List[str] = Field(
+        default_factory=list, description="The executed search queries"
+    )
     node_id: str = Field(default="", description="ID of the analysis node")
     results: List[SearchResultItem] = Field(
         default_factory=list, description="List of search results"

@@ -9,10 +9,10 @@ class LLMConfig:
     """Immutable configuration for the OpenRouter-powered LLM client."""
 
     api_key: str
-    model: str = "openai/gpt-oss-120b"
+    model: str = "x-ai/grok-4.1-fast"
     base_url: str = "https://openrouter.ai/api/v1"
     temperature: float = 0.2
-    max_output_tokens: int = 1200
+    max_output_tokens: int = 2400
 
     @classmethod
     def from_env(cls) -> "LLMConfig":
@@ -47,7 +47,7 @@ class LLMConfig:
 
     @classmethod
     def model_default(cls) -> str:
-        return "xiaomi/mimo-v2-flash:free"
+        return "x-ai/grok-4.1-fast"
 
     @classmethod
     def temperature_default(cls) -> float:
@@ -55,4 +55,4 @@ class LLMConfig:
 
     @classmethod
     def max_output_tokens_default(cls) -> int:
-        return 1200
+        return 2400

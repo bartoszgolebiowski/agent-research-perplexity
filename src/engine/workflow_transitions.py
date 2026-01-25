@@ -49,15 +49,11 @@ TRANSITIONS: Dict[
         ToolName.WEB_SEARCH,
         "Executing web search with formulated query",
     ),
-    WorkflowStage.ICP_EXTRACT_DATA: (
+    # New merged skill: Extract + Validate + Discover in one LLM call
+    WorkflowStage.ICP_PROCESS_RESULTS: (
         ActionType.LLM_SKILL,
-        SkillName.EXTRACT_DATA,
-        "Extracting structured data from search results",
-    ),
-    WorkflowStage.ICP_VALIDATE_DATA: (
-        ActionType.LLM_SKILL,
-        SkillName.VALIDATE_DATA,
-        "Validating extracted data completeness",
+        SkillName.PROCESS_RESULTS,
+        "Processing search results (Extract + Validate + Discover)",
     ),
     # Decision Gates
     WorkflowStage.ICP_DECISION_GATE: (
@@ -91,11 +87,6 @@ TRANSITIONS: Dict[
         "Node skipped (nice-to-have only)",
     ),
     # Phase C: Dynamic Expansion
-    WorkflowStage.ICP_DISCOVER_ENTITIES: (
-        ActionType.LLM_SKILL,
-        SkillName.DISCOVER_ENTITIES,
-        "Discovering new entities for dynamic expansion",
-    ),
     WorkflowStage.ICP_EXPAND_TREE: (
         ActionType.NOOP,
         _NOOP_PLACEHOLDER,

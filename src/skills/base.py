@@ -14,10 +14,8 @@ class SkillName(str, Enum):
 
     # ICP Intelligence System Skills
     FORMULATE_QUERY = "formulate_query"
-    EXTRACT_DATA = "extract_data"
-    VALIDATE_DATA = "validate_data"
     REFINE_QUERY = "refine_query"
-    DISCOVER_ENTITIES = "discover_entities"
+    PROCESS_RESULTS = "process_results"
 
 
 @dataclass(frozen=True, slots=True)

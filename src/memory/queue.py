@@ -95,15 +95,22 @@ class AnalysisQueue:
         Add a dynamically discovered node to the queue.
 
         The node is added after its parent's position in processing order.
+        The node inherits depth from parent + 1.
         """
         node.parent_id = parent_id
+
+        # Inherit depth from parent
+        parent = self._nodes.get(parent_id)
+        if parent:
+            node.depth = parent.depth + 1
+
         self._nodes[node.id] = node
 
         # Also add to the parent's sub_tasks if input is available
         if self._input:
-            parent = self._input.get_node_by_id(parent_id)
-            if parent:
-                parent.sub_tasks.append(node)
+            parent_node = self._input.get_node_by_id(parent_id)
+            if parent_node:
+                parent_node.sub_tasks.append(node)
 
         # Add to queue
         self._queue.append(node.id)

@@ -44,45 +44,6 @@ class ExtractedFieldValue(BaseModel):
     )
 
 
-class ExtractDataOutput(BaseModel):
-    """Output from the data extraction skill."""
-
-    chain_of_thought: str = Field(
-        default="", description="Reasoning about the extraction process"
-    )
-    extracted_fields: List[ExtractedFieldValue] = Field(
-        default_factory=list, description="Successfully extracted field values"
-    )
-    missing_fields: List[str] = Field(
-        default_factory=list, description="Names of fields that could not be extracted"
-    )
-    partial_fields: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Fields with partial/uncertain data - field name to notes",
-    )
-
-
-class ValidateDataOutput(BaseModel):
-    """Output from the data validation skill."""
-
-    is_complete: bool = Field(
-        default=False, description="Whether all must-have fields are satisfied"
-    )
-    missing_must_have: List[str] = Field(
-        default_factory=list, description="Names of missing must-have fields"
-    )
-    missing_nice_to_have: List[str] = Field(
-        default_factory=list, description="Names of missing nice-to-have fields"
-    )
-    validation_notes: str = Field(default="", description="Notes about the validation")
-    recommended_action: str = Field(
-        default="proceed", description="Recommended next action: proceed, retry, fail"
-    )
-    retry_focus: List[str] = Field(
-        default_factory=list, description="Fields to focus on in retry query"
-    )
-
-
 class RefineQueryOutput(BaseModel):
     """Output from the query refinement skill (for retries)."""
 
@@ -100,16 +61,45 @@ class RefineQueryOutput(BaseModel):
     )
 
 
-class DiscoverEntitiesOutput(BaseModel):
-    """Output from entity discovery skill (for dynamic expansion)."""
+class ProcessSearchResultsOutput(BaseModel):
+    """
+    Merged output for Extraction, Validation, and Entity Discovery.
 
+    This skill combines three sequential operations into a single LLM call
+    for improved efficiency while maintaining all required outputs.
+    """
+
+    # Extraction Section
+    extracted_fields: List[ExtractedFieldValue] = Field(
+        default_factory=list, description="Successfully extracted field values"
+    )
+    missing_fields: List[str] = Field(
+        default_factory=list, description="Names of fields that could not be extracted"
+    )
+
+    # Validation Section
+    is_complete: bool = Field(
+        default=False, description="Whether all must-have fields are satisfied"
+    )
+    recommended_action: str = Field(
+        default="proceed",
+        description="Recommended next action: proceed, retry, fail, partial",
+    )
+    retry_focus: List[str] = Field(
+        default_factory=list, description="Fields to focus on in retry query"
+    )
+
+    # Discovery Section
     discovered_entities: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="List of discovered entities to add as sub-tasks",
     )
-    discovery_notes: str = Field(
-        default="", description="Notes about the discovery process"
-    )
     should_expand: bool = Field(
         default=False, description="Whether new sub-tasks should be created"
+    )
+
+    # Reasoning
+    chain_of_thought: str = Field(
+        default="",
+        description="Step-by-step reasoning for extraction, validation, and discovery",
     )

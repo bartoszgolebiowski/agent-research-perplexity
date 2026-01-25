@@ -22,6 +22,14 @@ You are an expert research query formulator. Your task is to convert a human-rea
 - **{{ key }}**: {{ value }}
 {% endfor %}
 
+### Target Entity
+{% if global_constraints.custom_parameters.target_name %}
+- **Company/Entity Name:** {{ global_constraints.custom_parameters.target_name }}
+{% endif %}
+{% if global_constraints.custom_parameters.target_domain %}
+- **Website Domain:** {{ global_constraints.custom_parameters.target_domain }}
+{% endif %}
+
 ### Global Constraints
 - **Currency:** {{ global_constraints.currency }}
 - **Target Years:** {{ global_constraints.target_years | join(", ") }}
@@ -30,13 +38,18 @@ You are an expert research query formulator. Your task is to convert a human-rea
 ### Instructions
 
 1. Analyze the task description and target fields
-2. Create a **precise, keyword-heavy** search query optimized for web search
-3. Include specific terms that will help find exact data points
-4. Consider the global constraints (currency, years) when formulating the query
-5. Provide alternative query formulations for fallback
+2. **ALWAYS include the target entity name** (e.g., "{{ global_constraints.custom_parameters.target_name | default('Company Name') }}") in your search query
+3. Create a **precise, keyword-heavy** search query optimized for web search
+4. Include specific terms that will help find exact data points
+5. Consider the global constraints (currency, years) when formulating the query
+6. Provide alternative query formulations for fallback
+
+**CRITICAL:** Every search query MUST start with or prominently include the target entity name to avoid generic results.
 
 **Example Transformation:**
-- Input: "Find the company's revenue"
+- Input: "Find the company's revenue" (Target: Microsoft)
 - Output: "Microsoft consolidated annual revenue 2024 USD financial report"
+- ❌ WRONG: "company annual revenue 2024" (too generic, missing entity name)
+- ✅ CORRECT: "{{ global_constraints.custom_parameters.target_name | default('Microsoft') }} annual revenue 2024 USD"
 
-Generate a search query that will maximize the chance of finding all the target fields.
+Generate a search query that will maximize the chance of finding all the target fields for the specified target entity.
