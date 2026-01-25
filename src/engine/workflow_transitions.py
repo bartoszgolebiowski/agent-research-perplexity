@@ -49,11 +49,31 @@ TRANSITIONS: Dict[
         ToolName.WEB_SEARCH,
         "Executing web search with formulated query",
     ),
-    # New merged skill: Extract + Validate + Discover in one LLM call
-    WorkflowStage.ICP_PROCESS_RESULTS: (
+    # Split processing for better reliability with mid-sized LLMs
+    WorkflowStage.ICP_VERIFY_SOURCE: (
         ActionType.LLM_SKILL,
-        SkillName.PROCESS_RESULTS,
-        "Processing search results (Extract + Validate + Discover)",
+        SkillName.VERIFY_SOURCE,
+        "Verifying search results are about target company",
+    ),
+    WorkflowStage.ICP_VERIFY_DECISION: (
+        ActionType.NOOP,
+        _NOOP_PLACEHOLDER,
+        "Decision gate - routing based on source verification",
+    ),
+    WorkflowStage.ICP_EXTRACT_DATA: (
+        ActionType.LLM_SKILL,
+        SkillName.EXTRACT_DATA,
+        "Extracting structured data from verified results",
+    ),
+    WorkflowStage.ICP_VALIDATE_EXTRACTION: (
+        ActionType.LLM_SKILL,
+        SkillName.VALIDATE_EXTRACTION,
+        "Validating extraction completeness",
+    ),
+    WorkflowStage.ICP_DISCOVER_ENTITIES: (
+        ActionType.LLM_SKILL,
+        SkillName.DISCOVER_ENTITIES,
+        "Discovering new entities for investigation",
     ),
     # Decision Gates
     WorkflowStage.ICP_DECISION_GATE: (

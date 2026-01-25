@@ -8,9 +8,13 @@ from pydantic import BaseModel
 
 from src.skills.base import SkillName
 from src.skills.models import (
+    DiscoverEntitiesOutput,
+    ExtractDataOutput,
     FormulateQueryOutput,
     ProcessSearchResultsOutput,
     RefineQueryOutput,
+    ValidateExtractionOutput,
+    VerifySourceOutput,
 )
 from src.tools.models import ToolName, WebSearchResponse
 
@@ -140,29 +144,65 @@ def skill_refine_query_handler(
     return new_state
 
 
-def skill_process_results_handler(
-    state: AgentState, output: ProcessSearchResultsOutput
+# ---------------------------------------------------------------------------
+# Split Skill Handlers (for mid-sized LLMs)
+# ---------------------------------------------------------------------------
+
+
+def skill_verify_source_handler(
+    state: AgentState, output: VerifySourceOutput
 ) -> AgentState:
     """
-    Handler for the merged PROCESS_RESULTS skill.
+    Handler for VERIFY_SOURCE skill.
 
-    This handler processes extraction, validation, and discovery in one shot,
-    then routes to the appropriate next stage based on the combined output.
-    It also enforces depth limits for dynamic expansion.
+    If verification fails (is_valid = false), route to REFINE_QUERY to retry
+    with a more specific query targeting the correct company.
     """
-    from .queue import AnalysisQueue
-    from .models import AnalysisNode
-
     new_state = deepcopy(state)
 
-    # 1. Store raw source content immediately for permanent record
-    raw_content = ""
-    if new_state.working.current_search_results:
-        raw_content = getattr(
-            new_state.working.current_search_results, "raw_content", ""
+    # Store verification result in working memory
+    new_state.working.current_verification = output.model_dump()
+
+    # Log verification in episodic memory
+    new_state.episodic.extraction_history.append(
+        {
+            "node_id": new_state.working.current_node_id,
+            "timestamp": datetime.now().isoformat(),
+            "action": "source_verification",
+            "is_valid": output.is_valid,
+            "confidence": output.confidence,
+            "notes": output.verification_notes,
+        }
+    )
+
+    if not output.is_valid:
+        # Verification failed - search results are NOT about target company
+        new_state.working.retry_reason = (
+            f"Source verification failed: {output.verification_notes}. "
+            f"Detected company: {output.detected_company or 'unknown'}. "
+            f"Need more specific query for target company."
+        )
+        new_state.workflow.record_transition(
+            to_stage=WorkflowStage.ICP_REFINE_QUERY,
+            reason=f"Source verification failed - results not about target company",
+        )
+    else:
+        # Verification passed - proceed to data extraction
+        new_state.workflow.record_transition(
+            to_stage=WorkflowStage.ICP_EXTRACT_DATA,
+            reason=f"Source verified (confidence: {output.confidence})",
         )
 
-    # 2. Process Extraction: Store extracted data in working memory
+    return new_state
+
+
+def skill_extract_data_handler(
+    state: AgentState, output: ExtractDataOutput
+) -> AgentState:
+    """Handler for EXTRACT_DATA skill."""
+    new_state = deepcopy(state)
+
+    # Store extracted data in working memory (keep as model for attribute access)
     new_state.working.current_extracted_data = output
     new_state.working.missing_fields = output.missing_fields
 
@@ -171,74 +211,99 @@ def skill_process_results_handler(
         {
             "node_id": new_state.working.current_node_id,
             "timestamp": datetime.now().isoformat(),
+            "action": "data_extraction",
             "extracted_count": len(output.extracted_fields),
             "missing_count": len(output.missing_fields),
+        }
+    )
+
+    # Always proceed to validation after extraction
+    new_state.workflow.record_transition(
+        to_stage=WorkflowStage.ICP_VALIDATE_EXTRACTION,
+        reason=f"Extracted {len(output.extracted_fields)} fields, validating completeness",
+    )
+
+    return new_state
+
+
+def skill_validate_extraction_handler(
+    state: AgentState, output: ValidateExtractionOutput
+) -> AgentState:
+    """Handler for VALIDATE_EXTRACTION skill."""
+    new_state = deepcopy(state)
+
+    # Store validation result in working memory
+    new_state.working.current_validation_result = output.model_dump()
+
+    # Log validation in episodic memory
+    new_state.episodic.extraction_history.append(
+        {
+            "node_id": new_state.working.current_node_id,
+            "timestamp": datetime.now().isoformat(),
+            "action": "validation",
             "is_complete": output.is_complete,
             "recommended_action": output.recommended_action,
         }
     )
 
-    # 3. Process Validation: Route based on recommended_action
+    # Route based on recommended_action
     if output.recommended_action == "retry":
-        new_state.working.retry_reason = output.chain_of_thought
+        new_state.working.retry_reason = output.validation_reasoning
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_REFINE_QUERY,
             reason=f"Retry needed: missing {output.retry_focus}",
         )
-        return new_state
-
-    if output.recommended_action == "fail":
+    elif output.recommended_action == "fail":
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_NODE_FAILED,
-            reason="Validation failed after exhausting options",
+            reason="Validation failed after exhausting retries",
         )
-        return new_state
-
-    if output.recommended_action == "partial":
-        # Store validation result
-        new_state.working.current_validation_result = {
-            "is_complete": output.is_complete,
-            "recommended_action": output.recommended_action,
-        }
+    elif output.recommended_action == "partial":
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_NODE_PARTIAL,
             reason="Partial data extracted",
         )
-        return new_state
+    else:  # "proceed"
+        # Success - move to entity discovery
+        new_state.workflow.record_transition(
+            to_stage=WorkflowStage.ICP_DISCOVER_ENTITIES,
+            reason="Validation passed - proceeding to entity discovery",
+        )
 
-    # 4. Process Expansion (only if proceeding and entities discovered)
-    # Enforce depth limit
-    current_node = new_state.get_current_node()
-    global_constraints = new_state.semantic.global_constraints or {}
-    max_depth = global_constraints.get("max_depth", 3)
-    current_depth = getattr(current_node, "depth", 0) if current_node else 0
+    return new_state
 
-    can_expand = (
-        output.should_expand
-        and output.discovered_entities
-        and current_depth < max_depth
+
+def skill_discover_entities_handler(
+    state: AgentState, output: DiscoverEntitiesOutput
+) -> AgentState:
+    """Handler for DISCOVER_ENTITIES skill."""
+    new_state = deepcopy(state)
+
+    # Store discovery result in working memory
+    new_state.working.query_analysis = output.model_dump()
+
+    # Log discovery in episodic memory
+    new_state.episodic.extraction_history.append(
+        {
+            "node_id": new_state.working.current_node_id,
+            "timestamp": datetime.now().isoformat(),
+            "action": "entity_discovery",
+            "should_expand": output.should_expand,
+            "entities_found": len(output.discovered_entities),
+        }
     )
 
-    if can_expand:
-        # Store discovered entities for tree expansion
-        new_state.working.query_analysis = {
-            "discovered_entities": output.discovered_entities,
-            "discovery_notes": output.chain_of_thought,
-        }
+    if output.should_expand and output.discovered_entities:
+        # Expand tree with discovered entities
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_EXPAND_TREE,
-            reason=f"Discovered {len(output.discovered_entities)} entities at depth {current_depth}",
+            reason=f"Discovered {len(output.discovered_entities)} entities for expansion",
         )
     else:
-        # No expansion (either not requested, no entities, or depth limit reached)
-        reason = "Data complete"
-        if output.should_expand and current_depth >= max_depth:
-            reason = (
-                f"Data complete (depth limit {max_depth} reached, skipping expansion)"
-            )
+        # No expansion - node complete
         new_state.workflow.record_transition(
             to_stage=WorkflowStage.ICP_NODE_COMPLETE,
-            reason=reason,
+            reason="Data complete (no entity expansion)",
         )
 
     return new_state
@@ -247,7 +312,10 @@ def skill_process_results_handler(
 _SKILL_HANDLERS: Dict[SkillName, SkillHandler] = {
     SkillName.FORMULATE_QUERY: skill_formulate_query_handler,  # type: ignore
     SkillName.REFINE_QUERY: skill_refine_query_handler,  # type: ignore
-    SkillName.PROCESS_RESULTS: skill_process_results_handler,  # type: ignore
+    SkillName.VERIFY_SOURCE: skill_verify_source_handler,  # type: ignore
+    SkillName.EXTRACT_DATA: skill_extract_data_handler,  # type: ignore
+    SkillName.VALIDATE_EXTRACTION: skill_validate_extraction_handler,  # type: ignore
+    SkillName.DISCOVER_ENTITIES: skill_discover_entities_handler,  # type: ignore
 }
 
 
@@ -325,10 +393,10 @@ def tool_web_search_handler(state: AgentState, output: WebSearchResponse) -> Age
                 reason=f"Search failed and no retries remaining or search limit reached: {output.error_message}",
             )
     else:
-        # Search succeeded, proceed to merged processing skill
+        # Search succeeded, proceed to source verification
         new_state.workflow.record_transition(
-            to_stage=WorkflowStage.ICP_PROCESS_RESULTS,
-            reason=f"Search returned {len(output.results)} results",
+            to_stage=WorkflowStage.ICP_VERIFY_SOURCE,
+            reason=f"Search returned {len(output.results)} results - verifying source",
         )
 
     return new_state

@@ -1,0 +1,80 @@
+{# Data Extraction Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Extract Structured Data
+
+You are a Research Analyst. Your task is to extract specific fields from the search results.
+
+---
+
+### Target Company
+
+{% if global_constraints.custom_parameters.target_name %}
+**Company:** {{ global_constraints.custom_parameters.target_name }}
+{% endif %}
+
+### Fields to Extract
+
+#### Must-Have Fields (Required)
+{% for field in current_node.extraction_fields if field.priority.value == 'must_have' %}
+- **{{ field.name }}**: {{ field.description }}
+  - Type: {{ field.data_type }}
+  {% if field.unit %}- Expected Unit: {{ field.unit }}{% endif %}
+{% else %}
+(No must-have fields defined)
+{% endfor %}
+
+#### Nice-to-Have Fields (Optional)
+{% for field in current_node.extraction_fields if field.priority.value == 'nice_to_have' %}
+- **{{ field.name }}**: {{ field.description }}
+  - Type: {{ field.data_type }}
+  {% if field.unit %}- Expected Unit: {{ field.unit }}{% endif %}
+{% else %}
+(No nice-to-have fields defined)
+{% endfor %}
+
+### Global Constraints
+- **Target Currency:** {{ global_constraints.currency }}
+- **Target Years:** {{ global_constraints.target_years | join(", ") }}
+
+### Search Results
+
+{% for result in search_results %}
+---
+**Source {{ loop.index }}:** [{{ result.title }}]({{ result.url }})
+{{ result.snippet }}
+---
+{% endfor %}
+
+### Full Response Content
+```
+{{ raw_content }}
+```
+
+---
+
+## Extraction Instructions
+
+1. **Parse** the search results carefully
+2. **Map** information to the requested extraction fields
+3. **Cite** every data point with the source URL
+4. **Normalize** data according to global constraints:
+   - Convert currency if needed (note original value)
+   - Ensure dates match the target years when relevant
+5. **List** fields that could not be found in `missing_fields`
+
+**Important:**
+- Every extracted value MUST have a `source_url` citation
+- Do NOT hallucinate or invent data
+- If uncertain, indicate lower confidence score
+- If data is from a different currency/unit, include notes about conversion
+
+---
+
+## Output
+
+Provide your extraction result:
+
+1. **extracted_fields**: List of extracted values with citations
+2. **missing_fields**: List of field names that could not be found
+3. **extraction_notes**: Any notes about the extraction process

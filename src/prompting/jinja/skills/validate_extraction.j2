@@ -1,0 +1,83 @@
+{# Extraction Validation Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Validate Extraction Completeness
+
+You are a Research Analyst. Your task is to validate whether the extraction meets the requirements.
+
+---
+
+### Extraction Results
+
+#### Successfully Extracted Fields
+{% for field in extracted_fields %}
+- **{{ field.field_name }}**: {{ field.value }} (confidence: {{ field.confidence }})
+  - Source: {{ field.source_url }}
+  {% if field.notes %}- Notes: {{ field.notes }}{% endif %}
+{% else %}
+(No fields extracted)
+{% endfor %}
+
+#### Missing Fields
+{% for field_name in missing_fields %}
+- {{ field_name }}
+{% else %}
+(None)
+{% endfor %}
+
+### Requirements
+
+#### Must-Have Fields (Required)
+{% for field in current_node.extraction_fields if field.priority.value == 'must_have' %}
+- {{ field.name }}
+{% else %}
+(No must-have fields defined)
+{% endfor %}
+
+### Current Attempt
+**Attempt:** {{ current_node.attempt_count + 1 }} of {{ current_node.max_retries }}
+
+---
+
+## Validation Instructions
+
+Evaluate the extraction:
+
+1. Check if **all must-have fields** were successfully extracted
+2. If all must-have fields present → Set `is_complete = true`
+3. If any must-have fields missing → Set `is_complete = false`
+
+### Decision Logic
+
+Set `recommended_action` based on:
+
+- **"proceed"** if:
+  - All must-have fields are extracted with acceptable confidence
+  - Set `is_complete = true`
+
+- **"retry"** if:
+  - Critical must-have fields are missing
+  - AND retries remaining (current attempt < max_retries)
+  - Set `is_complete = false`
+  - Populate `retry_focus` with missing must-have field names
+
+- **"fail"** if:
+  - Critical must-have fields are missing
+  - AND all retries are exhausted
+  - Set `is_complete = false`
+
+- **"partial"** if:
+  - Some must-have fields are present but not all
+  - AND retries are exhausted
+  - Set `is_complete = false`
+
+---
+
+## Output
+
+Provide your validation result:
+
+1. **is_complete**: Boolean - whether all must-have fields are satisfied
+2. **recommended_action**: One of "proceed", "retry", "fail", "partial"
+3. **retry_focus**: List of field names to focus on if retrying
+4. **validation_reasoning**: Clear explanation of your decision

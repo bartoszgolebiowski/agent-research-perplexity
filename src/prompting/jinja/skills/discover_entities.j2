@@ -1,0 +1,71 @@
+{# Entity Discovery Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Discover New Entities for Investigation
+
+You are a Research Analyst. Your task is to scan the search results for new entities worth investigating.
+
+---
+
+### Search Results Context
+
+{% for result in search_results %}
+---
+**Source {{ loop.index }}:** {{ result.title }}
+{{ result.snippet }}
+---
+{% endfor %}
+
+### Full Response Content
+```
+{{ raw_content }}
+```
+
+### Current Node
+**Name:** {{ current_node.name }}
+**Description:** {{ current_node.description }}
+**Depth:** {{ current_node.depth }}
+
+---
+
+## Discovery Instructions
+
+Look for:
+1. **Subsidiaries or Related Companies** - mentioned companies worth analyzing
+2. **Key People/Roles** - executives or decision-makers relevant to goals
+3. **Geographic Entities** - regional offices or markets worth separate analysis
+4. **Product Lines or Business Units** - distinct segments warranting analysis
+
+### Expansion Rules
+
+{% set is_dynamically_created = current_node.parent_id is not none %}
+{% set can_expand = not is_dynamically_created and current_node.depth < global_constraints.max_depth %}
+
+**Expansion Status:** {% if can_expand %}✅ Allowed{% else %}🚫 DISABLED ({% if is_dynamically_created %}dynamically created node cannot spawn children{% else %}max depth reached{% endif %}){% endif %}
+
+{% if not can_expand %}
+⚠️ **IMPORTANT**: Expansion is DISABLED for this node. You MUST set `should_expand = false` and leave `discovered_entities` empty.
+{% else %}
+Set `should_expand = true` ONLY if **ALL** conditions are met:
+- The entity is **clearly identified** (not vague mentions)
+- The entity is **relevant** to the analysis goals
+- Analysis would provide **additional value**
+- The entity is **not already** part of the analysis tree
+
+For each discovered entity, include:
+- `name`: Clear entity name
+- `description`: What to research about this entity
+- `entity_type`: Type (subsidiary, person, region, product)
+- `extraction_fields`: List of fields to extract (with name, description, priority, data_type)
+  - **IMPORTANT**: `priority` must be either `"must_have"` or `"nice_to_have"` (no other values)
+{% endif %}
+
+---
+
+## Output
+
+Provide your discovery result:
+
+1. **discovered_entities**: List of new entities to investigate (empty if expansion disabled)
+2. **should_expand**: Boolean - whether to add discovered entities to queue
+3. **discovery_reasoning**: Explanation of your decisions

@@ -1,0 +1,76 @@
+{# Source Verification Skill Template #}
+{% include 'memory/core.j2' %}
+
+## Task: Verify Search Results Source
+
+You are a Research Analyst. Your task is to verify that the search results are actually about the **target company** before proceeding with data extraction.
+
+---
+
+### Target Company
+
+{% if global_constraints.custom_parameters.target_name %}
+**PRIMARY TARGET:** {{ global_constraints.custom_parameters.target_name }}
+{% endif %}
+{% if global_constraints.custom_parameters.target_domain %}
+**Expected Domain:** {{ global_constraints.custom_parameters.target_domain }}
+{% endif %}
+
+### Analysis Context
+
+**Task:** {{ current_node.name }}
+**Description:** {{ current_node.description }}
+
+### Search Query Executed
+```
+{{ search_query }}
+```
+
+### Search Results
+
+{% for result in search_results %}
+---
+**Source {{ loop.index }}:** [{{ result.title }}]({{ result.url }})
+{% if result.published_date %}*Published: {{ result.published_date }}*{% endif %}
+
+{{ result.snippet }}
+---
+{% endfor %}
+
+### Full Response Content
+```
+{{ raw_content }}
+```
+
+---
+
+## Verification Instructions
+
+Check if the search results discuss the **target company**:
+
+{% if global_constraints.custom_parameters.target_name %}
+- ✓ **{{ global_constraints.custom_parameters.target_name }}** (exact company name match or clear synonym)
+{% endif %}
+{% if global_constraints.custom_parameters.target_domain %}
+- ✓ Domain **{{ global_constraints.custom_parameters.target_domain }}** is mentioned or linked
+{% endif %}
+
+### RED FLAGS - Results are INVALID if:
+
+🚫 **Wrong Company:** Data is about a different company with a similar name  
+🚫 **Generic/Mock Data:** Results contain example/placeholder data not tied to the target  
+🚫 **Irrelevant Context:** Results discuss industry-wide data without mentioning the target company  
+🚫 **Ambiguous Attribution:** Cannot clearly determine if data belongs to the target company
+
+---
+
+## Output
+
+Provide your verification result:
+
+1. **is_valid**: `true` if results are about the target company, `false` otherwise
+2. **confidence**: 0.0 to 1.0 (how confident you are in this verification)
+3. **verification_notes**: Clear explanation of your decision
+4. **detected_company**: If results are about a different company, name it
+
+**Be strict**: If you're not confident the data is about the target company, set `is_valid = false`.

@@ -316,6 +316,9 @@ class WorkingMemory(BaseModel):
     current_search_results: Optional[Any] = Field(
         default=None, description="Results from the most recent search"
     )
+    current_verification: Optional[Any] = Field(
+        default=None, description="Result of source verification"
+    )
     current_extracted_data: Optional[Any] = Field(
         default=None, description="Data extracted from the current search"
     )
